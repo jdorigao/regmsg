@@ -1,5 +1,7 @@
 use std::env;
 
+mod kmsdrm;
+
 // Função auxiliar para detectar o backend gráfico
 fn detect_backend() -> &'static str {
     if env::var("WAYLAND_DISPLAY").is_ok() {
@@ -13,7 +15,7 @@ pub fn list_modes() {
     if detect_backend() == "Wayland" {
         println!("Wayland: Listing display modes...");
     } else {
-        println!("KMS/DRM: Listing display modes...");
+        let _ = kmsdrm::drm_list_modes();
     }
 
 }
@@ -22,7 +24,7 @@ pub fn list_outputs() {
     if detect_backend() == "Wayland" {
         println!("Wayland: Listing outputs...");
     } else {
-        println!("KMS/DRM: Listing outputs...");
+        let _ = kmsdrm::drm_list_outputs();
     }
 }
 
@@ -30,7 +32,7 @@ pub fn current_mode() {
     if detect_backend() == "Wayland" {
         println!("Wayland: Showing current display mode...");
     } else {
-        println!("KMS/DRM: Showing current display mode...");
+        let _ = kmsdrm::drm_current_mode();
     }
 }
 
