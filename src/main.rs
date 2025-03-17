@@ -1,17 +1,8 @@
-use clap::{Arg, Command, value_parser};
-use std::env;
-use std::process;
+use clap::{Arg, Command};
+
+mod screen;
 
 fn main() {
-    // Check XDG session type
-    let session_type = match env::var("XDG_SESSION_TYPE") {
-        Ok(session_type) => session_type,
-        Err(e) => {
-            eprintln!("Error accessing XDG_SESSION_TYPE: {}", e);
-            process::exit(1);
-        }
-    };
-
     let matches = Command::new("regmsg")
         .version("0.1.0")
         .author("REG-Linux")
@@ -33,93 +24,55 @@ fn main() {
         )
         .subcommand(
             Command::new("setRotation")
-                .about("Sets the rotation (0|1|2|3)")
+                .about("Sets the rotation (0|90|180|270)")
                 .arg(
                     Arg::new("ROTATION")
                         .required(true)
-                        .value_parser(value_parser!(u8).range(0..=3)),
+                        .value_parser(["0", "90", "180", "270"]),
                 ),
         )
         .subcommand(Command::new("getDisplayMode").about("Gets the current display mode"))
         .subcommand(Command::new("getRefreshRate").about("Gets the current refresh rate"))
+        .subcommand(Command::new("getScreenshot").about("Get Screenshot"))
+        .subcommand(
+            Command::new("recorderScreen")
+                .about("Sets the recording mode (default|fast|compress)")
+                .arg(
+                    Arg::new("RECORDER")
+                        .required(true)
+                        .value_parser(["default", "fast", "compress"]),
+                ),
+        )
         .get_matches();
 
     match matches.subcommand() {
-        Some(("listModes", _)) => list_modes(),
-        Some(("listOutputs", _)) => list_outputs(),
-        Some(("currentMode", _)) => current_mode(),
-        Some(("currentOutput", _)) => current_output(),
-        Some(("currentResolution", _)) => current_resolution(),
+        Some(("listModes", _)) => screen::list_modes(),
+        Some(("listOutputs", _)) => screen::list_outputs(),
+        Some(("currentMode", _)) => screen::current_mode(),
+        Some(("currentOutput", _)) => screen::current_output(),
+        Some(("currentResolution", _)) => screen::current_resolution(),
         Some(("setMode", sub_matches)) => {
             let mode = sub_matches.get_one::<String>("MODE").unwrap();
-            set_mode(mode);
+            screen::set_mode(mode);
         }
         Some(("setOutput", sub_matches)) => {
             let output = sub_matches.get_one::<String>("OUTPUT").unwrap();
-            set_output(output);
+            screen::set_output(output);
         }
         Some(("setRotation", sub_matches)) => {
-            let rotation = sub_matches.get_one::<u8>("ROTATION").unwrap();
-            set_rotation(*rotation);
+            let rotation = sub_matches.get_one::<String>("ROTATION").unwrap();
+            screen::set_rotation(rotation);
         }
-        Some(("getDisplayMode", _)) => get_display_mode(&session_type),
-        Some(("getRefreshRate", _)) => get_refresh_rate(),
+        Some(("getDisplayMode", _)) => screen::get_display_mode(),
+        Some(("getRefreshRate", _)) => screen::get_refresh_rate(),
+        Some(("getScreenshot", _)) => screen::get_screenshot(),
+        Some(("recorderScreen", sub_matches)) => {
+            let recorder = sub_matches.get_one::<String>("RECORDER").unwrap();
+            screen::recorder(recorder);
+        }
         _ => {
             eprintln!("Invalid command. Use --help for usage information.");
             std::process::exit(1);
         }
     }
-}
-
-fn list_modes() {
-    // Implement the logic to list display modes
-    println!("Listing display modes...");
-}
-
-fn list_outputs() {
-    // Implement the logic to list outputs
-    println!("Listing outputs...");
-}
-
-fn current_mode() {
-    // Implement the logic to show the current display mode
-    println!("Showing current display mode...");
-}
-
-fn current_output() {
-    // Implement the logic to show the current output
-    println!("Showing current output...");
-}
-
-fn current_resolution() {
-    // Implement the logic to show the current resolution
-    println!("Showing current resolution...");
-}
-
-fn set_mode(mode: &str) {
-    // Implement the logic to set the display mode
-    println!("Setting display mode to {}...", mode);
-}
-
-fn set_output(output: &str) {
-    // Implement the logic to set the output
-    println!("Setting output to {}...", output);
-}
-
-fn set_rotation(rotation: u8) {
-    // Implement the logic to set the rotation
-    println!("Setting rotation to {}...", rotation);
-}
-
-fn get_display_mode(session_type: &str) {
-    match session_type {
-        "x11" => println!("Using backend X11."),
-        "wayland" => println!("Using backend Wayland."),
-        _ => println!("Using backend KMS/DRM."),
-    }
-}
-
-fn get_refresh_rate() {
-    // Implement the logic to get the current refresh rate
-    println!("Getting current refresh rate...");
 }
