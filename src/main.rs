@@ -1,6 +1,17 @@
 use clap::{Arg, Command, value_parser};
+use std::env;
+use std::process;
 
 fn main() {
+    // Check XDG session type
+    let session_type = match env::var("XDG_SESSION_TYPE") {
+        Ok(session_type) => session_type,
+        Err(e) => {
+            eprintln!("Error accessing XDG_SESSION_TYPE: {}", e);
+            process::exit(1);
+        }
+    };
+
     let matches = Command::new("regmsg")
         .version("0.1.0")
         .author("REG-Linux")
@@ -51,7 +62,7 @@ fn main() {
             let rotation = sub_matches.get_one::<u8>("ROTATION").unwrap();
             set_rotation(*rotation);
         }
-        Some(("getDisplayMode", _)) => get_display_mode(),
+        Some(("getDisplayMode", _)) => get_display_mode(&session_type),
         Some(("getRefreshRate", _)) => get_refresh_rate(),
         _ => {
             eprintln!("Invalid command. Use --help for usage information.");
@@ -100,9 +111,12 @@ fn set_rotation(rotation: u8) {
     println!("Setting rotation to {}...", rotation);
 }
 
-fn get_display_mode() {
-    // Implement the logic to get the current display mode
-    println!("Getting current display mode...");
+fn get_display_mode(session_type: &str) {
+    match session_type {
+        "x11" => println!("Using backend X11."),
+        "wayland" => println!("Using backend Wayland."),
+        _ => println!("Using backend KMS/DRM."),
+    }
 }
 
 fn get_refresh_rate() {
