@@ -48,7 +48,7 @@ pub fn current_resolution() {
     if detect_backend() == "Wayland" {
         println!("Wayland: Showing current resolution...");
     } else {
-        println!("KMS/DRM: Showing current resolution...");
+        let _ = kmsdrm::drm_current_resolution();
     }
 }
 

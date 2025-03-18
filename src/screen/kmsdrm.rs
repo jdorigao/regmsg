@@ -119,3 +119,25 @@ pub fn drm_current_output() -> Result<(), Box<dyn Error>> {
         })
     })
 }
+
+/// Lists the active display mode.
+pub fn drm_current_resolution() -> Result<(), Box<dyn Error>> {
+    let card = Card::open_first_available()?;
+    for_each_connector(&card, |connector_info| -> Result<(), Box<dyn Error>> {
+        Ok(if connector_info.state() == connector::State::Connected {
+            if let Some(encoder_id) = connector_info.current_encoder() {
+                let encoder_info = card.get_encoder(encoder_id)?;
+                if let Some(crtc_id) = encoder_info.crtc() {
+                    let crtc_info = card.get_crtc(crtc_id)?;
+                    if let Some(mode) = crtc_info.mode() {
+                        println!(
+                            "{}x{}",
+                            mode.size().0,
+                            mode.size().1
+                        );
+                    }
+                }
+            }
+        })
+    })
+}
