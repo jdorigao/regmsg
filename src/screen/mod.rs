@@ -95,7 +95,7 @@ pub fn get_refresh_rate() {
 
 pub fn get_screenshot() {
     if detect_backend() == "Wayland" {
-        println!("Wayland: Screenshot");
+        let _ = wayland::wayland_get_screenshot();
     } else {
         println!("KMS/DRM: Screenshot");
     }
