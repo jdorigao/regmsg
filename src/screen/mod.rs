@@ -100,11 +100,3 @@ pub fn get_screenshot() {
         println!("KMS/DRM: Screenshot");
     }
 }
-
-pub fn recorder(recorder: &str) {
-    if detect_backend() == "Wayland" {
-        println!("Wayland: Setting recording mode to {}...", recorder);
-    } else {
-        println!("KMS/DRM: Setting recording mode to {}...", recorder);
-    }
-}

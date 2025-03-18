@@ -33,16 +33,7 @@ fn main() {
         )
         .subcommand(Command::new("getDisplayMode").about("Gets the current display mode"))
         .subcommand(Command::new("getRefreshRate").about("Gets the current refresh rate"))
-        .subcommand(Command::new("getScreenshot").about("Get Screenshot"))
-        .subcommand(
-            Command::new("recorderScreen")
-                .about("Sets the recording mode (default|fast|compress)")
-                .arg(
-                    Arg::new("RECORDER")
-                        .required(true)
-                        .value_parser(["default", "fast", "compress"]),
-                ),
-        )
+        .subcommand(Command::new("getScreenshot").about("Get screenshot"))
         .get_matches();
 
     match matches.subcommand() {
@@ -66,10 +57,6 @@ fn main() {
         Some(("getDisplayMode", _)) => screen::get_display_mode(),
         Some(("getRefreshRate", _)) => screen::get_refresh_rate(),
         Some(("getScreenshot", _)) => screen::get_screenshot(),
-        Some(("recorderScreen", sub_matches)) => {
-            let recorder = sub_matches.get_one::<String>("RECORDER").unwrap();
-            screen::recorder(recorder);
-        }
         _ => {
             eprintln!("Invalid command. Use --help for usage information.");
             std::process::exit(1);
