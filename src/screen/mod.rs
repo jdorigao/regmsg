@@ -1,6 +1,7 @@
 use std::env;
 
 mod kmsdrm;
+mod wayland;
 
 // Função auxiliar para detectar o backend gráfico
 fn detect_backend() -> &'static str {
@@ -13,7 +14,7 @@ fn detect_backend() -> &'static str {
 
 pub fn list_modes() {
     if detect_backend() == "Wayland" {
-        println!("Wayland: Listing display modes...");
+        let _ = wayland::wayland_list_modes();
     } else {
         let _ = kmsdrm::drm_list_modes();
     }
@@ -22,7 +23,7 @@ pub fn list_modes() {
 
 pub fn list_outputs() {
     if detect_backend() == "Wayland" {
-        println!("Wayland: Listing outputs...");
+        let _ = wayland::wayland_list_outputs();
     } else {
         let _ = kmsdrm::drm_list_outputs();
     }
@@ -30,7 +31,7 @@ pub fn list_outputs() {
 
 pub fn current_mode() {
     if detect_backend() == "Wayland" {
-        println!("Wayland: Showing current display mode...");
+        let _ = wayland::wayland_current_mode();
     } else {
         let _ = kmsdrm::drm_current_mode();
     }
@@ -38,7 +39,7 @@ pub fn current_mode() {
 
 pub fn current_output() {
     if detect_backend() == "Wayland" {
-        println!("Wayland: Showing current output...");
+        let _ = wayland::wayland_current_output();
     } else {
         let _ = kmsdrm::drm_current_output();
     }
@@ -46,7 +47,7 @@ pub fn current_output() {
 
 pub fn current_resolution() {
     if detect_backend() == "Wayland" {
-        println!("Wayland: Showing current resolution...");
+        let _ = wayland::wayland_current_resolution();
     } else {
         let _ = kmsdrm::drm_current_resolution();
     }
@@ -86,7 +87,7 @@ pub fn get_display_mode() {
 
 pub fn get_refresh_rate() {
     if detect_backend() == "Wayland" {
-        println!("Wayland: Getting current refresh rate...");
+        let _ = wayland::wayland_get_refresh_rate();
     } else {
         let _ = kmsdrm::drm_get_refresh_rate();
     }
