@@ -41,20 +41,20 @@ fn parse_mode(mode: &str) -> Result<ModeInfo, Box<dyn std::error::Error>> {
     })
 }
 
-pub fn list_modes() {
+pub fn get_modes() {
     if detect_backend() == "Wayland" {
-        let _ = wayland::wayland_list_modes();
+        let _ = wayland::wayland_get_modes();
     } else {
-        let _ = kmsdrm::drm_list_modes();
+        let _ = kmsdrm::drm_get_modes();
     }
 
 }
 
-pub fn list_outputs() {
+pub fn get_outputs() {
     if detect_backend() == "Wayland" {
-        let _ = wayland::wayland_list_outputs();
+        let _ = wayland::wayland_get_outputs();
     } else {
-        let _ = kmsdrm::drm_list_outputs();
+        let _ = kmsdrm::drm_get_outputs();
     }
 }
 
@@ -108,19 +108,11 @@ pub fn set_rotation(rotation: &str) {
     }
 }
 
-pub fn get_display_mode() {
+pub fn current_refresh() {
     if detect_backend() == "Wayland" {
-        println!("Using backend Wayland.");
+        let _ = wayland::wayland_current_refresh();
     } else {
-        println!("Using backend KMS/DRM.");
-    }
-}
-
-pub fn get_refresh_rate() {
-    if detect_backend() == "Wayland" {
-        let _ = wayland::wayland_get_refresh_rate();
-    } else {
-        let _ = kmsdrm::drm_get_refresh_rate();
+        let _ = kmsdrm::drm_current_refresh();
     }
 }
 

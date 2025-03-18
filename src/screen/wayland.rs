@@ -3,7 +3,7 @@ use std::process::Command;
 use chrono::Local;
 use std::fs;
 
-pub fn wayland_list_modes() -> Result<(), Box<dyn std::error::Error>> {
+pub fn wayland_get_modes() -> Result<(), Box<dyn std::error::Error>> {
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -19,7 +19,7 @@ pub fn wayland_list_modes() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn wayland_list_outputs() -> Result<(), Box<dyn std::error::Error>> {
+pub fn wayland_get_outputs() -> Result<(), Box<dyn std::error::Error>> {
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -174,7 +174,7 @@ pub fn wayland_set_rotation(rotation: &str) -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
-pub fn wayland_get_refresh_rate() -> Result<(), Box<dyn std::error::Error>> {
+pub fn wayland_current_refresh() -> Result<(), Box<dyn std::error::Error>> {
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 

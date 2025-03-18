@@ -60,7 +60,7 @@ where
     })
 }
 
-pub fn drm_list_modes() -> Result<(), Box<dyn Error>> {
+pub fn drm_get_modes() -> Result<(), Box<dyn Error>> {
     let card = Card::open_first_available()?;
     for_each_connector(&card, |connector_info| {
         Ok(for mode in connector_info.modes() {
@@ -74,7 +74,7 @@ pub fn drm_list_modes() -> Result<(), Box<dyn Error>> {
     })
 }
 
-pub fn drm_list_outputs() -> Result<(), Box<dyn Error>> {
+pub fn drm_get_outputs() -> Result<(), Box<dyn Error>> {
     let card = Card::open_first_available()?;
     for_each_connector(&card, |connector_info| {
         Ok(println!(
@@ -155,7 +155,7 @@ pub fn drm_set_rotation(rotation: &str) -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
-pub fn drm_get_refresh_rate() -> Result<(), Box<dyn Error>> {
+pub fn drm_current_refresh() -> Result<(), Box<dyn Error>> {
     let card = Card::open_first_available()?;
     for_each_connector(&card, |connector_info| -> Result<(), Box<dyn Error>> {
         Ok(if connector_info.state() == connector::State::Connected {
