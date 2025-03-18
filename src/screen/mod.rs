@@ -40,7 +40,7 @@ pub fn current_output() {
     if detect_backend() == "Wayland" {
         println!("Wayland: Showing current output...");
     } else {
-        println!("KMS/DRM: Showing current output...");
+        let _ = kmsdrm::drm_current_output();
     }
 }
 

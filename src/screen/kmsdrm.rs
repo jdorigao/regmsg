@@ -54,26 +54,24 @@ where
     F: FnMut(&connector::Info) -> Result<(), Box<dyn Error>>,
 {
     let resources = drm_device.resource_handles()?;
-    for connector in resources.connectors() {
+    Ok(for connector in resources.connectors() {
         let connector_info = drm_device.get_connector(*connector, true)?;
         f(&connector_info)?;
-    }
-    Ok(())
+    })
 }
 
 /// Lists all available display modes for each connector.
 pub fn drm_list_modes() -> Result<(), Box<dyn Error>> {
     let card = Card::open_first_available()?;
     for_each_connector(&card, |connector_info| {
-        for mode in connector_info.modes() {
+        Ok(for mode in connector_info.modes() {
             println!(
                 "{}x{}@{}",
                 mode.size().0,
                 mode.size().1,
                 mode.vrefresh()
             );
-        }
-        Ok(())
+        })
     })
 }
 
@@ -81,40 +79,43 @@ pub fn drm_list_modes() -> Result<(), Box<dyn Error>> {
 pub fn drm_list_outputs() -> Result<(), Box<dyn Error>> {
     let card = Card::open_first_available()?;
     for_each_connector(&card, |connector_info| {
-        println!(
+        Ok(println!(
             "{:?} | {:?}",
             connector_info.interface(),
             connector_info.state()
-        );
-        Ok(())
+        ))
     })
 }
 
 /// Lists the active display mode for each connected connector.
 pub fn drm_current_mode() -> Result<(), Box<dyn Error>> {
     let card = Card::open_first_available()?;
-    for_each_connector(&card, |connector_info| {
-        if connector_info.state() == connector::State::Connected {
+    for_each_connector(&card, |connector_info| -> Result<(), Box<dyn Error>> {
+        Ok(if connector_info.state() == connector::State::Connected {
             if let Some(encoder_id) = connector_info.current_encoder() {
                 let encoder_info = card.get_encoder(encoder_id)?;
                 if let Some(crtc_id) = encoder_info.crtc() {
                     let crtc_info = card.get_crtc(crtc_id)?;
                     if let Some(mode) = crtc_info.mode() {
                         println!(
-                            "{:?} | {}x{}@{}",
-                            connector_info.interface(),
+                            "{}x{}@{}",
                             mode.size().0,
                             mode.size().1,
                             mode.vrefresh()
                         );
-                        return Ok(());
                     }
                 }
             }
-            Err("No active mode found".into())
-        } else {
-            println!("{:?} | Disconnected", connector_info.interface());
-            Ok(())
-        }
+        })
+    })
+}
+
+/// Lists detailed information about the currently active output connector.
+pub fn drm_current_output() -> Result<(), Box<dyn Error>> {
+    let card = Card::open_first_available()?;
+    for_each_connector(&card, |connector_info| {
+        Ok(if connector_info.state() == connector::State::Connected {
+            println!("{:?}",connector_info.interface());
+        })
     })
 }
