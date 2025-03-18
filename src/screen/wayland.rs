@@ -69,21 +69,108 @@ pub fn wayland_current_resolution() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn wayland_set_mode(width: u32, height: u32, vrefresh: u32) -> Result<(), Box<dyn std::error::Error>> {
-    println!(
-        "[TODO] Wayland: Setting display mode to {}x{}@{}...",
-        width, height, vrefresh
-    );
+pub fn wayland_set_mode(width: i32, height: i32, vrefresh: i32) -> Result<(), Box<dyn std::error::Error>> {
+    // Estabelece uma conexão com o sway via IPC
+    let mut connection = Connection::new()?;
+
+    // Obtém a lista de outputs (monitores) disponíveis
+    let outputs: Vec<Output> = connection.get_outputs()?;
+
+    // Itera sobre todos os outputs e tenta definir o modo de exibição
+    for output in outputs {
+        let output_name = &output.name;
+
+        // Verifica se o modo de exibição solicitado está disponível para o output
+        let mode_exists = output.modes.iter().any(|mode| {
+            mode.width == width && mode.height == height
+        });
+
+        if !mode_exists {
+            println!(
+                "Mode {}x{}@{}Hz is not available for output '{}'",
+                width, height, vrefresh, output_name
+            );
+            continue;
+        }
+
+        // Envia um comando IPC para definir o modo de exibição
+        let command = format!(
+            "output {} mode {}x{}@{}Hz",
+            output_name, width, height, vrefresh
+        );
+        let replies = connection.run_command(&command)?;
+
+        // Verifica se o comando foi executado com sucesso
+        for reply in replies {
+            if reply.is_err() {
+                return Err(format!(
+                    "Failed to set mode for output '{}': {}",
+                    output_name, reply.unwrap_err()
+                )
+                .into());
+            }
+        }
+
+        println!(
+            "Mode set to {}x{}@{}Hz for output '{}'",
+            width, height, vrefresh, output_name
+        );
+    }
+
     Ok(())
 }
 
 pub fn wayland_set_output(output: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("[TODO] Wayland: Setting output for {}...", output);
+    let mut connection = Connection::new()?;
+    let outputs: Vec<Output> = connection.get_outputs()?;
+
+    let output_exists = outputs.iter().any(|o| o.name == output);
+    if !output_exists {
+        return Err(format!("Output '{}' not found", output).into());
+    }
+
+    // Sends an IPC command to enable the specified output
+    let command = format!("output {} enable", output);
+    let replies = connection.run_command(&command)?;
+
+    // Check if the command was executed successfully
+    for reply in replies {
+        if let Err(error) = reply {
+            return Err(format!("Failed to set output: {}", error).into());
+        }
+    }
+    println!("Output '{}' set successfully", output);
     Ok(())
 }
 
 pub fn wayland_set_rotation(rotation: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("[TODO] Wayland: Setting rotation for {}...", rotation);
+    let mut connection = Connection::new()?;
+    let outputs: Vec<Output> = connection.get_outputs()?;
+
+    // Checks if the given rotation is valid
+    let valid_rotations = ["0", "90", "180", "270"];
+    if !valid_rotations.contains(&rotation) {
+        return Err(format!("Invalid rotation: '{}'. Valid options are: {:?}", rotation, valid_rotations).into());
+    }
+
+    // Iterates over all outputs and applies rotation
+    for output in outputs {
+        let output_name = &output.name;
+
+        // Envia um comando IPC para definir a rotação do output
+        let command = format!("output {} transform {}", output_name, rotation);
+        let replies = connection.run_command(&command)?;
+
+        // Verifica se o comando foi executado com sucesso
+        for reply in replies {
+            if let Err(error) = reply {
+                return Err(format!("Failed to set rotation for output '{}': {}", output_name, error).into());
+            }
+        }
+
+        println!("Rotation set to '{}' for output '{}'", rotation, output_name);
+    }
+
     Ok(())
 }
 

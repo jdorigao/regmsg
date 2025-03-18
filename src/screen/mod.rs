@@ -5,9 +5,9 @@ mod wayland;
 
 #[derive(Debug)]
 struct ModeInfo {
-    width: u32,
-    height: u32,
-    vrefresh: u32,
+    width: i32,
+    height: i32,
+    vrefresh: i32,
 }
 
 // Função auxiliar para detectar o backend gráfico
@@ -26,10 +26,10 @@ fn parse_mode(mode: &str) -> Result<ModeInfo, Box<dyn std::error::Error>> {
         return Err("Invalid mode format. Use 'WxH@R' or 'WxH'".into());
     }
 
-    let width = parts[0].parse::<u32>()?;
-    let height = parts[1].parse::<u32>()?;
+    let width = parts[0].parse::<i32>()?;
+    let height = parts[1].parse::<i32>()?;
     let vrefresh = if parts.len() == 3 {
-        parts[2].parse::<u32>()?
+        parts[2].parse::<i32>()?
     } else {
         60 // Default refresh rate
     };

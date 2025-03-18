@@ -137,7 +137,7 @@ pub fn drm_current_resolution() -> Result<(), Box<dyn Error>> {
     })
 }
 
-pub fn drm_set_mode(width: u32, height: u32, vrefresh: u32) -> Result<(), Box<dyn Error>> {
+pub fn drm_set_mode(width: i32, height: i32, vrefresh: i32) -> Result<(), Box<dyn Error>> {
     println!(
         "[TODO] KMS/DRM: Setting display mode to {}x{}@{}...",
         width, height, vrefresh
