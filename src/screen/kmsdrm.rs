@@ -60,7 +60,6 @@ where
     })
 }
 
-/// Lists all available display modes for each connector.
 pub fn drm_list_modes() -> Result<(), Box<dyn Error>> {
     let card = Card::open_first_available()?;
     for_each_connector(&card, |connector_info| {
@@ -75,7 +74,6 @@ pub fn drm_list_modes() -> Result<(), Box<dyn Error>> {
     })
 }
 
-/// Lists all connectors and their states.
 pub fn drm_list_outputs() -> Result<(), Box<dyn Error>> {
     let card = Card::open_first_available()?;
     for_each_connector(&card, |connector_info| {
@@ -87,7 +85,6 @@ pub fn drm_list_outputs() -> Result<(), Box<dyn Error>> {
     })
 }
 
-/// Lists the active display mode for each connected connector.
 pub fn drm_current_mode() -> Result<(), Box<dyn Error>> {
     let card = Card::open_first_available()?;
     for_each_connector(&card, |connector_info| -> Result<(), Box<dyn Error>> {
@@ -110,7 +107,6 @@ pub fn drm_current_mode() -> Result<(), Box<dyn Error>> {
     })
 }
 
-/// Lists detailed information about the currently active output connector.
 pub fn drm_current_output() -> Result<(), Box<dyn Error>> {
     let card = Card::open_first_available()?;
     for_each_connector(&card, |connector_info| {
@@ -120,7 +116,6 @@ pub fn drm_current_output() -> Result<(), Box<dyn Error>> {
     })
 }
 
-/// Lists the active display mode.
 pub fn drm_current_resolution() -> Result<(), Box<dyn Error>> {
     let card = Card::open_first_available()?;
     for_each_connector(&card, |connector_info| -> Result<(), Box<dyn Error>> {
@@ -142,7 +137,24 @@ pub fn drm_current_resolution() -> Result<(), Box<dyn Error>> {
     })
 }
 
-/// Lists the active refresh rate.
+pub fn drm_set_mode(width: u32, height: u32, vrefresh: u32) -> Result<(), Box<dyn Error>> {
+    println!(
+        "[TODO] KMS/DRM: Setting display mode to {}x{}@{}...",
+        width, height, vrefresh
+    );
+    Ok(())
+}
+
+pub fn drm_set_output(output: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("[TODO] KMS/DRM: Setting output for {}...", output);
+    Ok(())
+}
+
+pub fn drm_set_rotation(rotation: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("[TODO] KMS/DRM: Setting rotation for {}...", rotation);
+    Ok(())
+}
+
 pub fn drm_get_refresh_rate() -> Result<(), Box<dyn Error>> {
     let card = Card::open_first_available()?;
     for_each_connector(&card, |connector_info| -> Result<(), Box<dyn Error>> {
@@ -158,4 +170,9 @@ pub fn drm_get_refresh_rate() -> Result<(), Box<dyn Error>> {
             }
         })
     })
+}
+
+pub fn drm_get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
+    println!("[TODO] KMS/DRM: Screenshot");
+    Ok(())
 }

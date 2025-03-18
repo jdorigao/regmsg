@@ -3,6 +3,13 @@ use std::env;
 mod kmsdrm;
 mod wayland;
 
+#[derive(Debug)]
+struct ModeInfo {
+    width: u32,
+    height: u32,
+    vrefresh: u32,
+}
+
 // Função auxiliar para detectar o backend gráfico
 fn detect_backend() -> &'static str {
     if env::var("WAYLAND_DISPLAY").is_ok() {
@@ -10,6 +17,28 @@ fn detect_backend() -> &'static str {
     } else {
         "KMS/DRM"
     }
+}
+
+/// Parses a display mode string in the format "WxH@R" or "WxH".
+fn parse_mode(mode: &str) -> Result<ModeInfo, Box<dyn std::error::Error>> {
+    let parts: Vec<&str> = mode.split(&['x', '@'][..]).collect();
+    if parts.len() < 2 || parts.len() > 3 {
+        return Err("Invalid mode format. Use 'WxH@R' or 'WxH'".into());
+    }
+
+    let width = parts[0].parse::<u32>()?;
+    let height = parts[1].parse::<u32>()?;
+    let vrefresh = if parts.len() == 3 {
+        parts[2].parse::<u32>()?
+    } else {
+        60 // Default refresh rate
+    };
+
+    Ok(ModeInfo {
+        width,
+        height,
+        vrefresh,
+    })
 }
 
 pub fn list_modes() {
@@ -53,27 +82,29 @@ pub fn current_resolution() {
     }
 }
 
-pub fn set_mode(mode: &str) {
+pub fn set_mode(mode: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let mode_set = parse_mode(mode)?;
     if detect_backend() == "Wayland" {
-        println!("Wayland: Setting display mode to {}...", mode);
+        let _ = wayland::wayland_set_mode(mode_set.width, mode_set.height, mode_set.vrefresh);
     } else {
-        println!("KMS/DRM: Setting display mode to {}...", mode);
+        let _ = kmsdrm::drm_set_mode(mode_set.width, mode_set.height, mode_set.vrefresh);
     }
+    Ok(())
 }
 
 pub fn set_output(output: &str) {
     if detect_backend() == "Wayland" {
-        println!("Wayland: Setting output to {}...", output);
+        let _ = wayland::wayland_set_output(output);
     } else {
-        println!("KMS/DRM: Setting output to {}...", output);
+        let _ = kmsdrm::drm_set_output(output);
     }
 }
 
 pub fn set_rotation(rotation: &str) {
     if detect_backend() == "Wayland" {
-        println!("Wayland: Setting rotation to {}...", rotation);
+        let _ = wayland::wayland_set_rotation(rotation);
     } else {
-        println!("KMS/DRM: Setting rotation to {}...", rotation);
+        let _ = kmsdrm::drm_set_rotation(rotation);
     }
 }
 
@@ -97,6 +128,6 @@ pub fn get_screenshot() {
     if detect_backend() == "Wayland" {
         let _ = wayland::wayland_get_screenshot();
     } else {
-        println!("KMS/DRM: Screenshot");
+        let _ = kmsdrm::drm_get_screenshot();
     }
 }

@@ -19,12 +19,12 @@ fn main() {
         )
         .subcommand(
             Command::new("setOutput")
-                .about("Sets the output")
+                .about("Sets the output WxH@R or WxH")
                 .arg(Arg::new("OUTPUT").required(true)),
         )
         .subcommand(
             Command::new("setRotation")
-                .about("Sets the rotation (0|90|180|270)")
+                .about("Sets the rotation 0|90|180|270")
                 .arg(
                     Arg::new("ROTATION")
                         .required(true)
@@ -44,7 +44,10 @@ fn main() {
         Some(("currentResolution", _)) => screen::current_resolution(),
         Some(("setMode", sub_matches)) => {
             let mode = sub_matches.get_one::<String>("MODE").unwrap();
-            screen::set_mode(mode);
+            if let Err(e) = screen::set_mode(mode) {
+                eprintln!("Error setting mode: {}", e);
+                std::process::exit(1);
+            }
         }
         Some(("setOutput", sub_matches)) => {
             let output = sub_matches.get_one::<String>("OUTPUT").unwrap();

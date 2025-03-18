@@ -43,16 +43,17 @@ pub fn wayland_current_mode() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn wayland_current_output() -> Result<String, Box<dyn std::error::Error>> {
+pub fn wayland_current_output() -> Result<(), Box<dyn std::error::Error>> {
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
     for output in outputs {
         if let Some(_current_mode) = output.current_mode {
-            return Ok(output.name)
+            println!("{}", output.name);
         }
     }
-    Err("No active output found".into())
+
+    Ok(())
 }
 
 pub fn wayland_current_resolution() -> Result<(), Box<dyn std::error::Error>> {
@@ -65,6 +66,24 @@ pub fn wayland_current_resolution() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    Ok(())
+}
+
+pub fn wayland_set_mode(width: u32, height: u32, vrefresh: u32) -> Result<(), Box<dyn std::error::Error>> {
+    println!(
+        "[TODO] Wayland: Setting display mode to {}x{}@{}...",
+        width, height, vrefresh
+    );
+    Ok(())
+}
+
+pub fn wayland_set_output(output: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("[TODO] Wayland: Setting output for {}...", output);
+    Ok(())
+}
+
+pub fn wayland_set_rotation(rotation: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("[TODO] Wayland: Setting rotation for {}...", rotation);
     Ok(())
 }
 
