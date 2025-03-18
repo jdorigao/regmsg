@@ -141,3 +141,21 @@ pub fn drm_current_resolution() -> Result<(), Box<dyn Error>> {
         })
     })
 }
+
+/// Lists the active refresh rate.
+pub fn drm_get_refresh_rate() -> Result<(), Box<dyn Error>> {
+    let card = Card::open_first_available()?;
+    for_each_connector(&card, |connector_info| -> Result<(), Box<dyn Error>> {
+        Ok(if connector_info.state() == connector::State::Connected {
+            if let Some(encoder_id) = connector_info.current_encoder() {
+                let encoder_info = card.get_encoder(encoder_id)?;
+                if let Some(crtc_id) = encoder_info.crtc() {
+                    let crtc_info = card.get_crtc(crtc_id)?;
+                    if let Some(mode) = crtc_info.mode() {
+                        println!("{}", mode.vrefresh());
+                    }
+                }
+            }
+        })
+    })
+}

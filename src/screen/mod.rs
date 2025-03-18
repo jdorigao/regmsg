@@ -88,7 +88,7 @@ pub fn get_refresh_rate() {
     if detect_backend() == "Wayland" {
         println!("Wayland: Getting current refresh rate...");
     } else {
-        println!("KMS/DRM: Getting current refresh rate...");
+        let _ = kmsdrm::drm_get_refresh_rate();
     }
 }
 
