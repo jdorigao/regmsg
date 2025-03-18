@@ -35,7 +35,7 @@ fn main() {
         .subcommand(Command::new("getScreenshot").about("Get screenshot"))
         .get_matches();
 
-    match matches.subcommand() {
+    if let Err(e) = match matches.subcommand() {
         Some(("getModes", _)) => screen::get_modes(),
         Some(("getOutputs", _)) => screen::get_outputs(),
         Some(("currentMode", _)) => screen::current_mode(),
@@ -44,23 +44,23 @@ fn main() {
         Some(("currentRefresh", _)) => screen::current_refresh(),
         Some(("setMode", sub_matches)) => {
             let mode = sub_matches.get_one::<String>("MODE").unwrap();
-            if let Err(e) = screen::set_mode(mode) {
-                eprintln!("Error setting mode: {}", e);
-                std::process::exit(1);
-            }
+            screen::set_mode(mode).map(|_| "Mode set successfully".to_string())
         }
         Some(("setOutput", sub_matches)) => {
             let output = sub_matches.get_one::<String>("OUTPUT").unwrap();
-            screen::set_output(output);
+            screen::set_output(output).map(|_| "Output set successfully".to_string())
         }
         Some(("setRotation", sub_matches)) => {
             let rotation = sub_matches.get_one::<String>("ROTATION").unwrap();
-            screen::set_rotation(rotation);
+            screen::set_rotation(rotation).map(|_| "Rotation set successfully".to_string())
         }
-        Some(("getScreenshot", _)) => screen::get_screenshot(),
+        Some(("getScreenshot", _)) => screen::get_screenshot().map(|_| "Screenshot taken successfully".to_string()),
         _ => {
             eprintln!("Invalid command. Use --help for usage information.");
             std::process::exit(1);
         }
+    } {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
     }
 }

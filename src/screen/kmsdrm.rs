@@ -60,82 +60,161 @@ where
     })
 }
 
-pub fn drm_get_modes() -> Result<(), Box<dyn Error>> {
+pub fn drm_get_modes() -> Result<String, Box<dyn Error>> {
     let card = Card::open_first_available()?;
+    let mut modes_string = String::new();
+
     for_each_connector(&card, |connector_info| {
-        Ok(for mode in connector_info.modes() {
-            println!(
-                "{}x{}@{}",
+        for mode in connector_info.modes() {
+            modes_string.push_str(&format!(
+                "{}x{}@{}Hz\n",
                 mode.size().0,
                 mode.size().1,
                 mode.vrefresh()
-            );
-        })
-    })
+            ));
+        }
+        Ok(())
+    })?;
+
+    if modes_string.is_empty() {
+        modes_string.push_str("No modes found.\n");
+    }
+    print!("{}", modes_string);
+    Ok(modes_string)
 }
 
-pub fn drm_get_outputs() -> Result<(), Box<dyn Error>> {
+pub fn drm_get_outputs() -> Result<String, Box<dyn Error>> {
     let card = Card::open_first_available()?;
+    let mut outputs_string = String::new();
+
     for_each_connector(&card, |connector_info| {
-        Ok(println!(
-            "{:?} | {:?}",
-            connector_info.interface(),
-            connector_info.state()
-        ))
-    })
+        outputs_string.push_str(&format!(
+            "{:?}\n",
+            connector_info.interface()
+        ));
+        Ok(())
+    })?;
+
+    if outputs_string.is_empty() {
+        outputs_string.push_str("No outputs found.\n");
+    }
+    print!("{}", outputs_string);
+    Ok(outputs_string)
 }
 
-pub fn drm_current_mode() -> Result<(), Box<dyn Error>> {
+pub fn drm_current_mode() -> Result<String, Box<dyn Error>> {
     let card = Card::open_first_available()?;
+    let mut current_mode_string = String::new();
+
     for_each_connector(&card, |connector_info| -> Result<(), Box<dyn Error>> {
-        Ok(if connector_info.state() == connector::State::Connected {
+        if connector_info.state() == connector::State::Connected {
             if let Some(encoder_id) = connector_info.current_encoder() {
                 let encoder_info = card.get_encoder(encoder_id)?;
                 if let Some(crtc_id) = encoder_info.crtc() {
                     let crtc_info = card.get_crtc(crtc_id)?;
                     if let Some(mode) = crtc_info.mode() {
-                        println!(
-                            "{}x{}@{}",
+                        current_mode_string.push_str(&format!(
+                            "{}x{}@{}Hz\n",
                             mode.size().0,
                             mode.size().1,
                             mode.vrefresh()
-                        );
+                        ));
                     }
                 }
             }
-        })
-    })
+        }
+        Ok(())
+    })?;
+
+    if current_mode_string.is_empty() {
+        current_mode_string.push_str("No current mode found.\n");
+    }
+    print!("{}", current_mode_string);
+    Ok(current_mode_string)
 }
 
-pub fn drm_current_output() -> Result<(), Box<dyn Error>> {
-    let card = Card::open_first_available()?;
-    for_each_connector(&card, |connector_info| {
-        Ok(if connector_info.state() == connector::State::Connected {
-            println!("{:?}",connector_info.interface());
-        })
-    })
-}
 
-pub fn drm_current_resolution() -> Result<(), Box<dyn Error>> {
+pub fn drm_current_output() -> Result<String, Box<dyn Error>> {
     let card = Card::open_first_available()?;
+    let mut current_output_string = String::new();
+
     for_each_connector(&card, |connector_info| -> Result<(), Box<dyn Error>> {
-        Ok(if connector_info.state() == connector::State::Connected {
+        if connector_info.state() == connector::State::Connected {
+            current_output_string.push_str(&format!(
+                "{:?}\n",
+                connector_info.interface()
+            ));
+        }
+        Ok(())
+    })?;
+
+    if current_output_string.is_empty() {
+        current_output_string.push_str("No current output found.\n");
+    }
+    print!("{}", current_output_string);
+    Ok(current_output_string)
+}
+
+
+pub fn drm_current_resolution() -> Result<String, Box<dyn Error>> {
+    let card = Card::open_first_available()?;
+    let mut current_resolution_string = String::new();
+
+    for_each_connector(&card, |connector_info| -> Result<(), Box<dyn Error>> {
+        if connector_info.state() == connector::State::Connected {
             if let Some(encoder_id) = connector_info.current_encoder() {
                 let encoder_info = card.get_encoder(encoder_id)?;
                 if let Some(crtc_id) = encoder_info.crtc() {
                     let crtc_info = card.get_crtc(crtc_id)?;
                     if let Some(mode) = crtc_info.mode() {
-                        println!(
-                            "{}x{}",
+                        current_resolution_string.push_str(&format!(
+                            "{}x{}\n",
                             mode.size().0,
                             mode.size().1
-                        );
+                        ));
                     }
                 }
             }
-        })
-    })
+        }
+        Ok(())
+    })?;
+
+    if current_resolution_string.is_empty() {
+        current_resolution_string.push_str("No current resolution found.\n");
+    }
+    print!("{}", current_resolution_string);
+    Ok(current_resolution_string)
 }
+
+pub fn drm_current_refresh() -> Result<String, Box<dyn Error>> {
+    let card = Card::open_first_available()?;
+    let mut current_refresh_string = String::new();
+
+    for_each_connector(&card, |connector_info| -> Result<(), Box<dyn Error>> {
+        if connector_info.state() == connector::State::Connected {
+            if let Some(encoder_id) = connector_info.current_encoder() {
+                let encoder_info = card.get_encoder(encoder_id)?;
+                if let Some(crtc_id) = encoder_info.crtc() {
+                    let crtc_info = card.get_crtc(crtc_id)?;
+                    if let Some(mode) = crtc_info.mode() {
+                        current_refresh_string.push_str(&format!(
+                            "{}Hz\n",
+                            mode.vrefresh()
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(())
+    })?;
+
+    if current_refresh_string.is_empty() {
+        current_refresh_string.push_str("No current refresh rate found.\n");
+    }
+    print!("{}", current_refresh_string);
+    Ok(current_refresh_string)
+}
+
 
 pub fn drm_set_mode(width: i32, height: i32, vrefresh: i32) -> Result<(), Box<dyn Error>> {
     println!(
@@ -153,23 +232,6 @@ pub fn drm_set_output(output: &str) -> Result<(), Box<dyn std::error::Error>> {
 pub fn drm_set_rotation(rotation: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("[TODO] KMS/DRM: Setting rotation for {}...", rotation);
     Ok(())
-}
-
-pub fn drm_current_refresh() -> Result<(), Box<dyn Error>> {
-    let card = Card::open_first_available()?;
-    for_each_connector(&card, |connector_info| -> Result<(), Box<dyn Error>> {
-        Ok(if connector_info.state() == connector::State::Connected {
-            if let Some(encoder_id) = connector_info.current_encoder() {
-                let encoder_info = card.get_encoder(encoder_id)?;
-                if let Some(crtc_id) = encoder_info.crtc() {
-                    let crtc_info = card.get_crtc(crtc_id)?;
-                    if let Some(mode) = crtc_info.mode() {
-                        println!("{}", mode.vrefresh());
-                    }
-                }
-            }
-        })
-    })
 }
 
 pub fn drm_get_screenshot() -> Result<(), Box<dyn std::error::Error>> {

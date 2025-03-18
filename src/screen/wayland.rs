@@ -3,70 +3,127 @@ use std::process::Command;
 use chrono::Local;
 use std::fs;
 
-pub fn wayland_get_modes() -> Result<(), Box<dyn std::error::Error>> {
+pub fn wayland_get_modes() -> Result<String, Box<dyn std::error::Error>> {
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
+    let mut modes_string = String::new();
+
     for output in outputs {
         if let Some(current_mode) = output.current_mode {
-            println!("{}x{}@{}Hz | Current Mode", current_mode.width, current_mode.height, current_mode.refresh / 1000);
+            modes_string.push_str(&format!(
+                "{}x{}@{}Hz\n",
+                current_mode.width, current_mode.height, current_mode.refresh / 1000
+            ));
         }
         for mode in output.modes {
-            println!("{}x{}@{}Hz", mode.width, mode.height, mode.refresh / 1000);
+            modes_string.push_str(&format!(
+                "{}x{}@{}Hz\n",
+                mode.width, mode.height, mode.refresh / 1000
+            ));
         }
     }
-
-    Ok(())
+    print!("{}", modes_string);
+    Ok(modes_string)
 }
 
-pub fn wayland_get_outputs() -> Result<(), Box<dyn std::error::Error>> {
+pub fn wayland_get_outputs() -> Result<String, Box<dyn std::error::Error>> {
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
+
+    let mut outputs_string = String::new();
 
     for output in outputs {
-        println!("{}", output.name);
+        outputs_string.push_str(&format!("{}\n", output.name));
     }
-
-    Ok(())
+    print!("{}", outputs_string);
+    Ok(outputs_string)
 }
 
-pub fn wayland_current_mode() -> Result<(), Box<dyn std::error::Error>> {
+
+pub fn wayland_current_mode() -> Result<String, Box<dyn std::error::Error>> {
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
+
+    let mut current_mode_string = String::new();
 
     for output in outputs {
         if let Some(current_mode) = output.current_mode {
-            println!("{}x{}@{}Hz", current_mode.width, current_mode.height, current_mode.refresh / 1000);
+            current_mode_string.push_str(&format!(
+                "{}x{}@{}Hz\n",
+                current_mode.width, current_mode.height, current_mode.refresh / 1000
+            ));
         }
     }
 
-    Ok(())
+    if current_mode_string.is_empty() {
+        current_mode_string.push_str("No current mode found.\n");
+    }
+    print!("{}", current_mode_string);
+    Ok(current_mode_string)
 }
 
-pub fn wayland_current_output() -> Result<(), Box<dyn std::error::Error>> {
+pub fn wayland_current_output() -> Result<String, Box<dyn std::error::Error>> {
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
+
+    let mut current_output_string = String::new();
 
     for output in outputs {
         if let Some(_current_mode) = output.current_mode {
-            println!("{}", output.name);
+            current_output_string.push_str(&format!("{}\n", output.name));
         }
     }
 
-    Ok(())
+    if current_output_string.is_empty() {
+        current_output_string.push_str("No current output found.\n");
+    }
+    print!("{}", current_output_string);
+    Ok(current_output_string)
 }
 
-pub fn wayland_current_resolution() -> Result<(), Box<dyn std::error::Error>> {
+pub fn wayland_current_resolution() -> Result<String, Box<dyn std::error::Error>> {
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
+    let mut resolution_string = String::new();
+
     for output in outputs {
         if let Some(current_mode) = output.current_mode {
-            println!("{}x{}", current_mode.width, current_mode.height);
+            resolution_string.push_str(&format!(
+                "{}x{}\n",
+                current_mode.width, current_mode.height
+            ));
         }
     }
 
-    Ok(())
+    if resolution_string.is_empty() {
+        resolution_string.push_str("No current resolution found.\n");
+    }
+    print!("{}", resolution_string);
+    Ok(resolution_string)
+}
+
+pub fn wayland_current_refresh() -> Result<String, Box<dyn std::error::Error>> {
+    let mut connection = Connection::new()?;
+    let outputs: Vec<Output> = connection.get_outputs()?;
+
+    let mut refresh_string = String::new();
+
+    for output in outputs {
+        if let Some(current_mode) = output.current_mode {
+            refresh_string.push_str(&format!(
+                "{}Hz\n",
+                current_mode.refresh / 1000
+            ));
+        }
+    }
+
+    if refresh_string.is_empty() {
+        refresh_string.push_str("No current refresh rate found.\n");
+    }
+    print!("{}", refresh_string);
+    Ok(refresh_string)
 }
 
 pub fn wayland_set_mode(width: i32, height: i32, vrefresh: i32) -> Result<(), Box<dyn std::error::Error>> {
@@ -169,19 +226,6 @@ pub fn wayland_set_rotation(rotation: &str) -> Result<(), Box<dyn std::error::Er
         }
 
         println!("Rotation set to '{}' for output '{}'", rotation, output_name);
-    }
-
-    Ok(())
-}
-
-pub fn wayland_current_refresh() -> Result<(), Box<dyn std::error::Error>> {
-    let mut connection = Connection::new()?;
-    let outputs: Vec<Output> = connection.get_outputs()?;
-
-    for output in outputs {
-        if let Some(current_mode) = output.current_mode {
-            println!("{}Hz", current_mode.refresh / 1000);
-        }
     }
 
     Ok(())

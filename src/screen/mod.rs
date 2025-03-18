@@ -13,9 +13,9 @@ struct ModeInfo {
 // Função auxiliar para detectar o backend gráfico
 fn detect_backend() -> &'static str {
     if env::var("WAYLAND_DISPLAY").is_ok() {
-        "Wayland"
+        return "Wayland"
     } else {
-        "KMS/DRM"
+        return "KMS/DRM"
     }
 }
 
@@ -26,100 +26,98 @@ fn parse_mode(mode: &str) -> Result<ModeInfo, Box<dyn std::error::Error>> {
         return Err("Invalid mode format. Use 'WxH@R' or 'WxH'".into());
     }
 
-    let width = parts[0].parse::<i32>()?;
-    let height = parts[1].parse::<i32>()?;
+    let width = parts[0].parse::<i32>().map_err(|_| "Invalid width")?;
+    let height = parts[1].parse::<i32>().map_err(|_| "Invalid height")?;
     let vrefresh = if parts.len() == 3 {
-        parts[2].parse::<i32>()?
+        parts[2].parse::<i32>().map_err(|_| "Invalid refresh rate")?
     } else {
         60 // Default refresh rate
     };
 
-    Ok(ModeInfo {
-        width,
-        height,
-        vrefresh,
-    })
+    Ok(ModeInfo { width, height, vrefresh })
 }
 
-pub fn get_modes() {
-    if detect_backend() == "Wayland" {
-        let _ = wayland::wayland_get_modes();
-    } else {
-        let _ = kmsdrm::drm_get_modes();
-    }
-
-}
-
-pub fn get_outputs() {
-    if detect_backend() == "Wayland" {
-        let _ = wayland::wayland_get_outputs();
-    } else {
-        let _ = kmsdrm::drm_get_outputs();
+pub fn get_modes() -> Result<String, Box<dyn std::error::Error>> {
+    match detect_backend() {
+        "Wayland" => wayland::wayland_get_modes(),
+        "KMS/DRM" => kmsdrm::drm_get_modes(),
+        _ => Ok("Unknown backend. Unable to determine display settings.\n".to_string()),
     }
 }
 
-pub fn current_mode() {
-    if detect_backend() == "Wayland" {
-        let _ = wayland::wayland_current_mode();
-    } else {
-        let _ = kmsdrm::drm_current_mode();
+pub fn get_outputs() -> Result<String, Box<dyn std::error::Error>> {
+    match detect_backend() {
+        "Wayland" => wayland::wayland_get_outputs(),
+        "KMS/DRM" => kmsdrm::drm_get_outputs(),
+        _ => Ok("Unknown backend. Unable to determine display settings.\n".to_string()),
     }
 }
 
-pub fn current_output() {
-    if detect_backend() == "Wayland" {
-        let _ = wayland::wayland_current_output();
-    } else {
-        let _ = kmsdrm::drm_current_output();
+pub fn current_mode() -> Result<String, Box<dyn std::error::Error>> {
+    match detect_backend() {
+        "Wayland" => wayland::wayland_current_mode(),
+        "KMS/DRM" => kmsdrm::drm_current_mode(),
+        _ => Ok("Unknown backend. Unable to determine display settings.\n".to_string()),
     }
 }
 
-pub fn current_resolution() {
-    if detect_backend() == "Wayland" {
-        let _ = wayland::wayland_current_resolution();
-    } else {
-        let _ = kmsdrm::drm_current_resolution();
+pub fn current_output() -> Result<String, Box<dyn std::error::Error>> {
+    match detect_backend() {
+        "Wayland" => wayland::wayland_current_output(),
+        "KMS/DRM" => kmsdrm::drm_current_output(),
+        _ => Ok("Unknown backend. Unable to determine display settings.\n".to_string()),
+    }
+}
+
+pub fn current_resolution() -> Result<String, Box<dyn std::error::Error>> {
+    match detect_backend() {
+        "Wayland" => wayland::wayland_current_resolution(),
+        "KMS/DRM" => kmsdrm::drm_current_resolution(),
+        _ => Ok("Unknown backend. Unable to determine display settings.\n".to_string()),
+    }
+}
+
+pub fn current_refresh() -> Result<String, Box<dyn std::error::Error>> {
+    match detect_backend() {
+        "Wayland" => wayland::wayland_current_refresh(),
+        "KMS/DRM" => kmsdrm::drm_current_refresh(),
+        _ => Ok("Unknown backend. Unable to determine display settings.\n".to_string()),
     }
 }
 
 pub fn set_mode(mode: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mode_set = parse_mode(mode)?;
-    if detect_backend() == "Wayland" {
-        let _ = wayland::wayland_set_mode(mode_set.width, mode_set.height, mode_set.vrefresh);
-    } else {
-        let _ = kmsdrm::drm_set_mode(mode_set.width, mode_set.height, mode_set.vrefresh);
+    match detect_backend() {
+        "Wayland" => wayland::wayland_set_mode(mode_set.width, mode_set.height, mode_set.vrefresh)?,
+        "KMS/DRM" => kmsdrm::drm_set_mode(mode_set.width, mode_set.height, mode_set.vrefresh)?,
+        _ => println!("Unknown backend. Unable to determine display settings."),
     }
     Ok(())
 }
 
-pub fn set_output(output: &str) {
-    if detect_backend() == "Wayland" {
-        let _ = wayland::wayland_set_output(output);
-    } else {
-        let _ = kmsdrm::drm_set_output(output);
+pub fn set_output(output: &str) -> Result<(), Box<dyn std::error::Error>> {
+    match detect_backend() {
+        "Wayland" => wayland::wayland_set_output(output)?,
+        "KMS/DRM" => kmsdrm::drm_set_output(output)?,
+        _ => println!("Unknown backend. Unable to determine display settings."),
     }
+    Ok(())
 }
 
-pub fn set_rotation(rotation: &str) {
-    if detect_backend() == "Wayland" {
-        let _ = wayland::wayland_set_rotation(rotation);
-    } else {
-        let _ = kmsdrm::drm_set_rotation(rotation);
+pub fn set_rotation(rotation: &str) -> Result<(), Box<dyn std::error::Error>> {
+    match detect_backend() {
+        "Wayland" => wayland::wayland_set_rotation(rotation)?,
+        "KMS/DRM" => kmsdrm::drm_set_rotation(rotation)?,
+        _ => println!("Unknown backend. Unable to determine display settings."),
     }
+    Ok(())
 }
 
-pub fn current_refresh() {
-    if detect_backend() == "Wayland" {
-        let _ = wayland::wayland_current_refresh();
-    } else {
-        let _ = kmsdrm::drm_current_refresh();
+pub fn get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
+    match detect_backend() {
+        "Wayland" => wayland::wayland_get_screenshot()?,
+        "KMS/DRM" => kmsdrm::drm_get_screenshot()?,
+        _ => println!("Unknown backend. Unable to determine display settings."),
     }
-}
-
-pub fn get_screenshot() {
-    if detect_backend() == "Wayland" {
-        let _ = wayland::wayland_get_screenshot();
-    } else {
-        let _ = kmsdrm::drm_get_screenshot();
-    }
+    Ok(())
 }
