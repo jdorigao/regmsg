@@ -67,7 +67,8 @@ pub fn drm_list_modes() -> Result<String, Box<dyn Error>> {
     for_each_connector(&card, |connector_info| {
         for mode in connector_info.modes() {
             modes_string.push_str(&format!(
-                "{}x{}@{}Hz\n",
+                "{:?}:{}x{}@{}Hz\n",
+                mode.name(),
                 mode.size().0,
                 mode.size().1,
                 mode.vrefresh()

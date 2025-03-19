@@ -12,13 +12,15 @@ pub fn wayland_list_modes() -> Result<String, Box<dyn std::error::Error>> {
     for output in outputs {
         if let Some(current_mode) = output.current_mode {
             modes_string.push_str(&format!(
-                "{}x{}@{}Hz\n",
+                "{}x{}@{}:{}x{}@{}Hz\n",
+                current_mode.width, current_mode.height, current_mode.refresh,
                 current_mode.width, current_mode.height, current_mode.refresh / 1000
             ));
         }
         for mode in output.modes {
             modes_string.push_str(&format!(
-                "{}x{}@{}Hz\n",
+                "{}x{}@{}:{}x{}@{}Hz\n",
+                mode.width, mode.height, mode.refresh,
                 mode.width, mode.height, mode.refresh / 1000
             ));
         }
@@ -51,7 +53,7 @@ pub fn wayland_current_mode() -> Result<String, Box<dyn std::error::Error>> {
         if let Some(current_mode) = output.current_mode {
             current_mode_string.push_str(&format!(
                 "{}x{}@{}Hz\n",
-                current_mode.width, current_mode.height, current_mode.refresh / 1000
+                current_mode.width, current_mode.height, current_mode.refresh
             ));
         }
     }
