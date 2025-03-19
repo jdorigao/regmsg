@@ -37,18 +37,18 @@ fn parse_mode(mode: &str) -> Result<ModeInfo, Box<dyn std::error::Error>> {
     Ok(ModeInfo { width, height, vrefresh })
 }
 
-pub fn get_modes() -> Result<String, Box<dyn std::error::Error>> {
+pub fn list_modes() -> Result<String, Box<dyn std::error::Error>> {
     match detect_backend() {
-        "Wayland" => wayland::wayland_get_modes(),
-        "KMS/DRM" => kmsdrm::drm_get_modes(),
+        "Wayland" => wayland::wayland_list_modes(),
+        "KMS/DRM" => kmsdrm::drm_list_modes(),
         _ => Ok("Unknown backend. Unable to determine display settings.\n".to_string()),
     }
 }
 
-pub fn get_outputs() -> Result<String, Box<dyn std::error::Error>> {
+pub fn list_outputs() -> Result<String, Box<dyn std::error::Error>> {
     match detect_backend() {
-        "Wayland" => wayland::wayland_get_outputs(),
-        "KMS/DRM" => kmsdrm::drm_get_outputs(),
+        "Wayland" => wayland::wayland_list_outputs(),
+        "KMS/DRM" => kmsdrm::drm_list_outputs(),
         _ => Ok("Unknown backend. Unable to determine display settings.\n".to_string()),
     }
 }
@@ -117,6 +117,15 @@ pub fn get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
     match detect_backend() {
         "Wayland" => wayland::wayland_get_screenshot()?,
         "KMS/DRM" => kmsdrm::drm_get_screenshot()?,
+        _ => println!("Unknown backend. Unable to determine display settings."),
+    }
+    Ok(())
+}
+
+pub fn map_touch_screen() -> Result<(), Box<dyn std::error::Error>> {
+    match detect_backend() {
+        "Wayland" => wayland::wayland_map_touch_screen()?,
+        "KMS/DRM" => println!("No touchscreen support."),
         _ => println!("Unknown backend. Unable to determine display settings."),
     }
     Ok(())

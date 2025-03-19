@@ -7,8 +7,8 @@ fn main() {
         .version("0.0.0")
         .author("REG-Linux")
         .about("Manages screen resolution and display settings")
-        .subcommand(Command::new("getModes").about("Lists available display modes"))
-        .subcommand(Command::new("getOutputs").about("Lists available outputs"))
+        .subcommand(Command::new("listModes").about("Lists available display modes"))
+        .subcommand(Command::new("listOutputs").about("Lists available outputs"))
         .subcommand(Command::new("currentMode").about("Shows the current display mode"))
         .subcommand(Command::new("currentOutput").about("Shows the current output"))
         .subcommand(Command::new("currentResolution").about("Shows the current resolution"))
@@ -33,11 +33,12 @@ fn main() {
                 ),
         )
         .subcommand(Command::new("getScreenshot").about("Get screenshot"))
+        .subcommand(Command::new("mapTouchScreen").about("Maps the touchscreen"))
         .get_matches();
 
     if let Err(e) = match matches.subcommand() {
-        Some(("getModes", _)) => screen::get_modes(),
-        Some(("getOutputs", _)) => screen::get_outputs(),
+        Some(("listModes", _)) => screen::list_modes(),
+        Some(("listOutputs", _)) => screen::list_outputs(),
         Some(("currentMode", _)) => screen::current_mode(),
         Some(("currentOutput", _)) => screen::current_output(),
         Some(("currentResolution", _)) => screen::current_resolution(),
@@ -55,6 +56,7 @@ fn main() {
             screen::set_rotation(rotation).map(|_| "Rotation set successfully".to_string())
         }
         Some(("getScreenshot", _)) => screen::get_screenshot().map(|_| "Screenshot taken successfully".to_string()),
+        Some(("mapTouchScreen", _)) => screen::map_touch_screen().map(|_| "Screenshot taken successfully".to_string()),
         _ => {
             eprintln!("Invalid command. Use --help for usage information.");
             std::process::exit(1);

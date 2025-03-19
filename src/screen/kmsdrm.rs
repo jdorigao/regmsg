@@ -60,7 +60,7 @@ where
     })
 }
 
-pub fn drm_get_modes() -> Result<String, Box<dyn Error>> {
+pub fn drm_list_modes() -> Result<String, Box<dyn Error>> {
     let card = Card::open_first_available()?;
     let mut modes_string = String::new();
 
@@ -83,7 +83,7 @@ pub fn drm_get_modes() -> Result<String, Box<dyn Error>> {
     Ok(modes_string)
 }
 
-pub fn drm_get_outputs() -> Result<String, Box<dyn Error>> {
+pub fn drm_list_outputs() -> Result<String, Box<dyn Error>> {
     let card = Card::open_first_available()?;
     let mut outputs_string = String::new();
 

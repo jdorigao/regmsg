@@ -3,7 +3,7 @@ use std::process::Command;
 use chrono::Local;
 use std::fs;
 
-pub fn wayland_get_modes() -> Result<String, Box<dyn std::error::Error>> {
+pub fn wayland_list_modes() -> Result<String, Box<dyn std::error::Error>> {
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -27,7 +27,7 @@ pub fn wayland_get_modes() -> Result<String, Box<dyn std::error::Error>> {
     Ok(modes_string)
 }
 
-pub fn wayland_get_outputs() -> Result<String, Box<dyn std::error::Error>> {
+pub fn wayland_list_outputs() -> Result<String, Box<dyn std::error::Error>> {
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -268,5 +268,36 @@ pub fn wayland_get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("Screenshot saved in: {}", file_name);
+    Ok(())
+}
+
+pub fn wayland_map_touch_screen() -> Result<(), Box<dyn std::error::Error>> {
+    // Establish connection to Wayland server
+    let mut connection = Connection::new()?;
+
+    // Gets the list of inputs (input devices)
+    let inputs = connection.get_inputs()?;
+
+    // Find the touchscreen identifier
+    let touchscreen = inputs.iter()
+        .find(|input| input.input_type == "touch")
+        .map(|input| &input.identifier);
+
+    if let Some(touchscreen) = touchscreen {
+        let outputs = connection.get_outputs()?;
+
+        let focused_output = outputs.iter()
+            .find(|output| output.focused)
+            .map(|output| &output.name);
+
+        if let Some(output) = focused_output {
+            let command = format!("input {} map_to_output {}", touchscreen, output);
+            connection.run_command(&command)?;
+            println!("Mapped {} to {}", touchscreen, output);
+        }
+    } else {
+        println!("No touchscreen found.");
+    }
+
     Ok(())
 }
