@@ -13,3 +13,9 @@ clap = { version = "4.5.32", features = ["derive"] }
 drm = "0.14.1"
 swayipc = "3.0.3"
 chrono = "0.4.40"
+
+[profile.release]
+lto = true          # Enable LTO.
+strip = true        # Automatically strip symbols from the binary.
+codegen-units = 1   # Use a single codegen for size optimization.
+panic = "abort"     # Remove traceback information.
