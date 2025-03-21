@@ -9,6 +9,9 @@ pub fn wayland_list_modes() -> Result<String, Box<dyn std::error::Error>> {
 
     let mut modes_string = String::new();
 
+    modes_string.push_str(&format!("{}\n", "max-1920x1080:maximum 1920x1080"));
+    modes_string.push_str(&format!("{}\n", "max-640x480:maximum 640x480"));
+
     for output in outputs {
         if let Some(current_mode) = output.current_mode {
             modes_string.push_str(&format!(
@@ -301,5 +304,59 @@ pub fn wayland_map_touch_screen() -> Result<(), Box<dyn std::error::Error>> {
         println!("No touchscreen found.");
     }
 
+    Ok(())
+}
+
+pub fn wayland_min_to_max_resolution(max_resolution: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+    let (max_width, max_height) = if let Some(res) = max_resolution {
+        let parts: Vec<&str> = res.split('x').collect();
+        if parts.len() == 2 {
+            let width = parts[0].parse::<i32>().unwrap_or(1920);
+            let height = parts[1].parse::<i32>().unwrap_or(1080);
+            (width, height)
+        } else {
+            (1920, 1080)
+        }
+    } else {
+        (1920, 1080)
+    };
+
+    // Establishes a connection to sway via IPC
+    let mut connection = Connection::new()?;
+    let outputs: Vec<Output> = connection.get_outputs()?;
+
+    // Find the focused output
+    let focused_output = outputs.iter().find(|output| output.focused);
+
+    if let Some(output) = focused_output {
+        if let Some(current_mode) = &output.current_mode {
+            let current_width = current_mode.width;
+            let current_height = current_mode.height;
+
+            // Checks if the current resolution is already within limits
+            if current_width <= max_width && current_height <= max_height {
+                return Ok(());
+            }
+
+            // Search for a resolution mode that is within the limits
+            for mode in &output.modes {
+                if mode.width <= max_width && mode.height <= max_height {
+                    // Sets the new resolution mode
+                    let command = format!(
+                        "output {} mode {}x{}@{}Hz",
+                        output.name, mode.width, mode.height, mode.refresh
+                    );
+                    connection.run_command(&command)?;
+                    println!(
+                        "Resolution set to {}x{} for output '{}'",
+                        mode.width, mode.height, output.name
+                    );
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    println!("No suitable resolution found.");
     Ok(())
 }

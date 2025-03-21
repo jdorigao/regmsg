@@ -34,6 +34,7 @@ fn main() {
         )
         .subcommand(Command::new("getScreenshot").about("Get screenshot"))
         .subcommand(Command::new("mapTouchScreen").about("Maps the touchscreen"))
+        .subcommand(Command::new("minTomaxResolution").about("Maximum resolution 1920x1080"))
         .get_matches();
 
     if let Err(e) = match matches.subcommand() {
@@ -56,7 +57,8 @@ fn main() {
             screen::set_rotation(rotation).map(|_| "Rotation set successfully".to_string())
         }
         Some(("getScreenshot", _)) => screen::get_screenshot().map(|_| "Screenshot taken successfully".to_string()),
-        Some(("mapTouchScreen", _)) => screen::map_touch_screen().map(|_| "Screenshot taken successfully".to_string()),
+        Some(("mapTouchScreen", _)) => screen::map_touch_screen().map(|_| "Touch screen successfully mapped".to_string()),
+        Some(("minTomaxResolution", _)) => screen::min_to_max_resolution().map(|_| "Resolution set to maximum successfully".to_string()),
         _ => {
             eprintln!("Invalid command. Use --help for usage information.");
             std::process::exit(1);

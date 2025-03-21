@@ -239,3 +239,8 @@ pub fn drm_get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
     println!("[TODO] KMS/DRM: Screenshot");
     Ok(())
 }
+
+pub fn drm_to_max_resolution(max_resolution: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+    println!("[TODO] KMS/DRM: minTomaxResolution {:?}", max_resolution);
+    Ok(())
+}

@@ -86,11 +86,20 @@ pub fn current_refresh() -> Result<String, Box<dyn std::error::Error>> {
 }
 
 pub fn set_mode(mode: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let mode_set = parse_mode(mode)?;
-    match detect_backend() {
-        "Wayland" => wayland::wayland_set_mode(mode_set.width, mode_set.height, mode_set.vrefresh)?,
-        "KMS/DRM" => kmsdrm::drm_set_mode(mode_set.width, mode_set.height, mode_set.vrefresh)?,
-        _ => println!("Unknown backend. Unable to determine display settings."),
+    if mode.starts_with("max-") {
+        let max_resolution = mode.trim_start_matches("max-").to_string();
+        match detect_backend() {
+            "Wayland" => wayland::wayland_min_to_max_resolution(Some(max_resolution))?,
+            "KMS/DRM" => kmsdrm::drm_to_max_resolution(Some(max_resolution))?,
+            _ => println!("Unknown backend. Unable to determine display settings."),
+        }
+    } else {
+        let mode_set = parse_mode(mode)?;
+        match detect_backend() {
+            "Wayland" => wayland::wayland_set_mode(mode_set.width, mode_set.height, mode_set.vrefresh)?,
+            "KMS/DRM" => kmsdrm::drm_set_mode(mode_set.width, mode_set.height, mode_set.vrefresh)?,
+            _ => println!("Unknown backend. Unable to determine display settings."),
+        }
     }
     Ok(())
 }
@@ -126,6 +135,18 @@ pub fn map_touch_screen() -> Result<(), Box<dyn std::error::Error>> {
     match detect_backend() {
         "Wayland" => wayland::wayland_map_touch_screen()?,
         "KMS/DRM" => println!("No touchscreen support."),
+        _ => println!("Unknown backend. Unable to determine display settings."),
+    }
+    Ok(())
+}
+
+pub fn min_to_max_resolution() -> Result<(), Box<dyn std::error::Error>> {
+    // Sets the default maximum resolution to 1920x1080
+    let max_resolution = "1920x1080".to_string();
+
+    match detect_backend() {
+        "Wayland" => wayland::wayland_min_to_max_resolution(Some(max_resolution))?,
+        "KMS/DRM" => kmsdrm::drm_to_max_resolution(Some(max_resolution))?,
         _ => println!("Unknown backend. Unable to determine display settings."),
     }
     Ok(())
