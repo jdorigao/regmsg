@@ -8,45 +8,46 @@ fn main() {
     let matches = Command::new("regmsg")
         .version("0.0.0")
         .author("REG-Linux")
-        .about("Manages screen resolution and display settings")
+        .about("A tool to manage screen resolution and display settings.")
         .arg(
             Arg::new("screen")
                 .short('s')
                 .long("screen")
-                .help("Specifies the screen to apply the command to")
+                .help("Specifies the screen to apply the command to. Use this option to target a specific screen.")
                 .global(true),
         )
-        .subcommand(Command::new("listModes").about("Lists available display modes"))
-        .subcommand(Command::new("listOutputs").about("Lists available outputs"))
-        .subcommand(Command::new("currentMode").about("Shows the current display mode"))
-        .subcommand(Command::new("currentOutput").about("Shows the current output"))
-        .subcommand(Command::new("currentResolution").about("Shows the current resolution"))
-        .subcommand(Command::new("currentRefresh").about("Shows the current refresh rate"))
+        .subcommand(Command::new("listModes").about("Lists all available display modes for the specified screen."))
+        .subcommand(Command::new("listOutputs").about("Lists all available outputs (e.g., HDMI, VGA)."))
+        .subcommand(Command::new("currentMode").about("Displays the current display mode for the specified screen."))
+        .subcommand(Command::new("currentOutput").about("Displays the current output (e.g., HDMI, VGA)."))
+        .subcommand(Command::new("currentResolution").about("Displays the current resolution for the specified screen."))
+        .subcommand(Command::new("currentRefresh").about("Displays the current refresh rate for the specified screen."))
         .subcommand(
             Command::new("setMode")
-                .about("Sets the display mode")
-                .arg(Arg::new("MODE").required(true)),
+                .about("Sets the display mode for the specified screen.")
+                .arg(Arg::new("MODE").required(true).help("The display mode to set (e.g., 1920x1080@60).")),
         )
         .subcommand(
             Command::new("setOutput")
-                .about("Sets the output WxH@R or WxH")
-                .arg(Arg::new("OUTPUT").required(true)),
+                .about("Sets the output resolution and refresh rate (e.g., WxH@R or WxH).")
+                .arg(Arg::new("OUTPUT").required(true).help("The output resolution and refresh rate to set (e.g., 1920x1080@60).")),
         )
         .subcommand(
             Command::new("setRotation")
-                .about("Sets the rotation 0|90|180|270")
+                .about("Sets the screen rotation for the specified screen.")
                 .arg(
                     Arg::new("ROTATION")
                         .required(true)
-                        .value_parser(["0", "90", "180", "270"]),
+                        .value_parser(["0", "90", "180", "270"])
+                        .help("The rotation angle to set (0, 90, 180, or 270 degrees)."),
                 ),
         )
-        .subcommand(Command::new("getScreenshot").about("Get screenshot"))
-        .subcommand(Command::new("mapTouchScreen").about("Maps the touchscreen"))
-        .subcommand(Command::new("minTomaxResolution").about("Maximum resolution 1920x1080"))
+        .subcommand(Command::new("getScreenshot").about("Takes a screenshot of the current screen."))
+        .subcommand(Command::new("mapTouchScreen").about("Maps the touchscreen to the correct display."))
+        .subcommand(Command::new("minTomaxResolution").about("Sets the screen resolution to the maximum supported resolution (e.g., 1920x1080)."))
         .get_matches();
 
-    // Obter o valor do argumento `screen` do nível superior
+    // Get the value of the top-level `screen` argument
     let screen = matches.get_one::<String>("screen").map(|s| s.as_str());
 
     if let Err(e) = match matches.subcommand() {
