@@ -7,6 +7,13 @@ fn main() {
         .version("0.0.0")
         .author("REG-Linux")
         .about("Manages screen resolution and display settings")
+        .arg(
+            Arg::new("screen")
+                .short('s')
+                .long("screen")
+                .help("Specifies the screen to apply the command to")
+                .global(true),
+        )
         .subcommand(Command::new("listModes").about("Lists available display modes"))
         .subcommand(Command::new("listOutputs").about("Lists available outputs"))
         .subcommand(Command::new("currentMode").about("Shows the current display mode"))
@@ -37,16 +44,19 @@ fn main() {
         .subcommand(Command::new("minTomaxResolution").about("Maximum resolution 1920x1080"))
         .get_matches();
 
+    // Obter o valor do argumento `screen` do nível superior
+    let screen = matches.get_one::<String>("screen").map(|s| s.as_str());
+
     if let Err(e) = match matches.subcommand() {
-        Some(("listModes", _)) => screen::list_modes(),
+        Some(("listModes", _)) => screen::list_modes(screen),
         Some(("listOutputs", _)) => screen::list_outputs(),
-        Some(("currentMode", _)) => screen::current_mode(),
+        Some(("currentMode", _)) => screen::current_mode(screen),
         Some(("currentOutput", _)) => screen::current_output(),
-        Some(("currentResolution", _)) => screen::current_resolution(),
-        Some(("currentRefresh", _)) => screen::current_refresh(),
+        Some(("currentResolution", _)) => screen::current_resolution(screen),
+        Some(("currentRefresh", _)) => screen::current_refresh(screen),
         Some(("setMode", sub_matches)) => {
             let mode = sub_matches.get_one::<String>("MODE").unwrap();
-            screen::set_mode(mode).map(|_| "Mode set successfully".to_string())
+            screen::set_mode(screen, mode).map(|_| "Mode set successfully".to_string())
         }
         Some(("setOutput", sub_matches)) => {
             let output = sub_matches.get_one::<String>("OUTPUT").unwrap();
@@ -54,11 +64,11 @@ fn main() {
         }
         Some(("setRotation", sub_matches)) => {
             let rotation = sub_matches.get_one::<String>("ROTATION").unwrap();
-            screen::set_rotation(rotation).map(|_| "Rotation set successfully".to_string())
+            screen::set_rotation(screen, rotation).map(|_| "Rotation set successfully".to_string())
         }
         Some(("getScreenshot", _)) => screen::get_screenshot().map(|_| "Screenshot taken successfully".to_string()),
         Some(("mapTouchScreen", _)) => screen::map_touch_screen().map(|_| "Touch screen successfully mapped".to_string()),
-        Some(("minTomaxResolution", _)) => screen::min_to_max_resolution().map(|_| "Resolution set to maximum successfully".to_string()),
+        Some(("minTomaxResolution", _)) => screen::min_to_max_resolution(screen).map(|_| "Resolution set to maximum successfully".to_string()),
         _ => {
             eprintln!("Invalid command. Use --help for usage information.");
             std::process::exit(1);
