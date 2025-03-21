@@ -2,9 +2,17 @@ use swayipc::{Connection, Output, Mode};
 use std::process::Command;
 use chrono::Local;
 use std::fs;
+use log::{info, warn, error, debug};
 
-// Function to list available display modes for a specific screen (or all screens if none specified)
+/// Lists available display modes for a specific screen (or all screens if none specified).
+///
+/// # Arguments
+/// * `screen` - An optional screen name to filter the modes for a specific screen.
+///
+/// # Returns
+/// A `Result` containing a formatted string with the available modes or an error.
 pub fn wayland_list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
+    info!("Listing display modes for screen: {:?}", screen);
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -14,6 +22,7 @@ pub fn wayland_list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::e
         // If a specific screen was provided, filter by that screen
         if let Some(screen_name) = screen {
             if output.name != screen_name {
+                debug!("Skipping output {} as it does not match the specified screen.", output.name);
                 continue; // Skip outputs that do not match the screen name
             }
         }
@@ -43,13 +52,17 @@ pub fn wayland_list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::e
 
     // Prints the display modes (optional, depending on usage)
     print!("{}", modes_string);
-
+    info!("Display modes listed successfully.");
     // Returns the string with the display modes
     Ok(modes_string)
 }
 
-// Function to list all available outputs (screens)
+/// Lists all available outputs (screens).
+///
+/// # Returns
+/// A `Result` containing a formatted string with the available outputs or an error.
 pub fn wayland_list_outputs() -> Result<String, Box<dyn std::error::Error>> {
+    info!("Listing all available outputs.");
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -59,11 +72,19 @@ pub fn wayland_list_outputs() -> Result<String, Box<dyn std::error::Error>> {
         outputs_string.push_str(&format!("{}\n", output.name));
     }
     print!("{}", outputs_string);
+    info!("Outputs listed successfully.");
     Ok(outputs_string)
 }
 
-// Function to get the current display mode (resolution and refresh rate) for a specific screen (or all screens)
+/// Gets the current display mode (resolution and refresh rate) for a specific screen (or all screens).
+///
+/// # Arguments
+/// * `screen` - An optional screen name to filter the current mode for a specific screen.
+///
+/// # Returns
+/// A `Result` containing a formatted string with the current mode or an error.
 pub fn wayland_current_mode(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
+    info!("Getting current display mode for screen: {:?}", screen);
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -73,6 +94,7 @@ pub fn wayland_current_mode(screen: Option<&str>) -> Result<String, Box<dyn std:
         // If a specific screen was provided, filter by that screen
         if let Some(screen_name) = screen {
             if output.name != screen_name {
+                debug!("Skipping output {} as it does not match the specified screen.", output.name);
                 continue; // Skip outputs that do not match the screen name
             }
         }
@@ -86,14 +108,21 @@ pub fn wayland_current_mode(screen: Option<&str>) -> Result<String, Box<dyn std:
     }
 
     if current_mode_string.is_empty() {
+        warn!("No current mode found for the specified screen.");
         current_mode_string.push_str("No current mode found.\n");
+    } else {
+        info!("Current mode retrieved successfully.");
     }
     print!("{}", current_mode_string);
     Ok(current_mode_string)
 }
 
-// Function to get the current active output (screen)
+/// Gets the current active output (screen).
+///
+/// # Returns
+/// A `Result` containing a formatted string with the current active output or an error.
 pub fn wayland_current_output() -> Result<String, Box<dyn std::error::Error>> {
+    info!("Getting current active output.");
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -106,14 +135,24 @@ pub fn wayland_current_output() -> Result<String, Box<dyn std::error::Error>> {
     }
 
     if current_output_string.is_empty() {
+        warn!("No current output found.");
         current_output_string.push_str("No current output found.\n");
+    } else {
+        info!("Current output retrieved successfully.");
     }
     print!("{}", current_output_string);
     Ok(current_output_string)
 }
 
-// Function to get the current resolution for a specific screen (or all screens)
+/// Gets the current resolution for a specific screen (or all screens).
+///
+/// # Arguments
+/// * `screen` - An optional screen name to filter the resolution for a specific screen.
+///
+/// # Returns
+/// A `Result` containing a formatted string with the current resolution or an error.
 pub fn wayland_current_resolution(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
+    info!("Getting current resolution for screen: {:?}", screen);
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -123,6 +162,7 @@ pub fn wayland_current_resolution(screen: Option<&str>) -> Result<String, Box<dy
         // If a specific screen was provided, filter by that screen
         if let Some(screen_name) = screen {
             if output.name != screen_name {
+                debug!("Skipping output {} as it does not match the specified screen.", output.name);
                 continue; // Skip outputs that do not match the screen name
             }
         }
@@ -136,14 +176,24 @@ pub fn wayland_current_resolution(screen: Option<&str>) -> Result<String, Box<dy
     }
 
     if resolution_string.is_empty() {
+        warn!("No current resolution found for the specified screen.");
         resolution_string.push_str("No current resolution found.\n");
+    } else {
+        info!("Current resolution retrieved successfully.");
     }
     print!("{}", resolution_string);
     Ok(resolution_string)
 }
 
-// Function to get the current refresh rate for a specific screen (or all screens)
+/// Gets the current refresh rate for a specific screen (or all screens).
+///
+/// # Arguments
+/// * `screen` - An optional screen name to filter the refresh rate for a specific screen.
+///
+/// # Returns
+/// A `Result` containing a formatted string with the current refresh rate or an error.
 pub fn wayland_current_refresh(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
+    info!("Getting current refresh rate for screen: {:?}", screen);
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -153,6 +203,7 @@ pub fn wayland_current_refresh(screen: Option<&str>) -> Result<String, Box<dyn s
         // If a specific screen was provided, filter by that screen
         if let Some(screen_name) = screen {
             if output.name != screen_name {
+                debug!("Skipping output {} as it does not match the specified screen.", output.name);
                 continue; // Skip outputs that do not match the screen name
             }
         }
@@ -166,18 +217,28 @@ pub fn wayland_current_refresh(screen: Option<&str>) -> Result<String, Box<dyn s
     }
 
     if refresh_string.is_empty() {
+        warn!("No current refresh rate found for the specified screen.");
         refresh_string.push_str("No current refresh rate found.\n");
+    } else {
+        info!("Current refresh rate retrieved successfully.");
     }
     print!("{}", refresh_string);
     Ok(refresh_string)
 }
 
-// Function to set a specific display mode (resolution and refresh rate) for a screen
+/// Sets a specific display mode (resolution and refresh rate) for a screen.
+///
+/// # Arguments
+/// * `screen` - An optional screen name to set the mode for a specific screen.
+/// * `width` - The width of the resolution.
+/// * `height` - The height of the resolution.
+/// * `vrefresh` - The vertical refresh rate in Hz.
+///
+/// # Returns
+/// A `Result` indicating success or an error.
 pub fn wayland_set_mode(screen: Option<&str>, width: i32, height: i32, vrefresh: i32) -> Result<(), Box<dyn std::error::Error>> {
-    // Establish a connection to sway via IPC
+    info!("Setting display mode to {}x{}@{}Hz for screen: {:?}", width, height, vrefresh, screen);
     let mut connection = Connection::new()?;
-
-    // Get the list of available outputs (monitors)
     let outputs: Vec<Output> = connection.get_outputs()?;
 
     // Iterate over all outputs and attempt to set the display mode
@@ -185,6 +246,7 @@ pub fn wayland_set_mode(screen: Option<&str>, width: i32, height: i32, vrefresh:
         // If a specific screen was provided, filter by that screen
         if let Some(screen_name) = screen {
             if output.name != screen_name {
+                debug!("Skipping output {} as it does not match the specified screen.", output.name);
                 continue; // Skip outputs that do not match the screen name
             }
         }
@@ -199,6 +261,7 @@ pub fn wayland_set_mode(screen: Option<&str>, width: i32, height: i32, vrefresh:
                 "Mode {}x{}@{}Hz is not available for output '{}'",
                 width, height, vrefresh, output.name
             );
+            warn!("Mode {}x{}@{}Hz is not available for output '{}'", width, height, vrefresh, output.name);
             continue;
         }
 
@@ -211,10 +274,11 @@ pub fn wayland_set_mode(screen: Option<&str>, width: i32, height: i32, vrefresh:
 
         // Check if the command was executed successfully
         for reply in replies {
-            if reply.is_err() {
+            if let Err(error) = reply.as_ref() {
+                error!("Failed to set mode for output '{}': {}", output.name, error);
                 return Err(format!(
                     "Failed to set mode for output '{}': {}",
-                    output.name, reply.unwrap_err()
+                    output.name, error
                 )
                 .into());
             }
@@ -224,19 +288,28 @@ pub fn wayland_set_mode(screen: Option<&str>, width: i32, height: i32, vrefresh:
             "Mode set to {}x{}@{}Hz for output '{}'",
             width, height, vrefresh, output.name
         );
+        info!("Mode set to {}x{}@{}Hz for output '{}'", width, height, vrefresh, output.name);
     }
 
     Ok(())
 }
 
-// Function to enable a specific output (screen)
+/// Enables a specific output (screen).
+///
+/// # Arguments
+/// * `output` - The name of the output to enable.
+///
+/// # Returns
+/// A `Result` indicating success or an error.
 pub fn wayland_set_output(output: &str) -> Result<(), Box<dyn std::error::Error>> {
+    info!("Enabling output: {}", output);
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
     // Check if the specified output exists
     let output_exists = outputs.iter().any(|o| o.name == output);
     if !output_exists {
+        error!("Output '{}' not found", output);
         return Err(format!("Output '{}' not found", output).into());
     }
 
@@ -247,21 +320,32 @@ pub fn wayland_set_output(output: &str) -> Result<(), Box<dyn std::error::Error>
     // Check if the command was executed successfully
     for reply in replies {
         if let Err(error) = reply {
+            error!("Failed to set output: {}", error);
             return Err(format!("Failed to set output: {}", error).into());
         }
     }
     println!("Output '{}' set successfully", output);
+    info!("Output '{}' set successfully", output);
     Ok(())
 }
 
-// Function to set the rotation for a specific screen (or all screens)
+/// Sets the rotation for a specific screen (or all screens).
+///
+/// # Arguments
+/// * `screen` - An optional screen name to set the rotation for a specific screen.
+/// * `rotation` - The rotation value (0, 90, 180, or 270 degrees).
+///
+/// # Returns
+/// A `Result` indicating success or an error.
 pub fn wayland_set_rotation(screen: Option<&str>, rotation: &str) -> Result<(), Box<dyn std::error::Error>> {
+    info!("Setting rotation to '{}' for screen: {:?}", rotation, screen);
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
     // Check if the given rotation is valid
     let valid_rotations = ["0", "90", "180", "270"];
     if !valid_rotations.contains(&rotation) {
+        error!("Invalid rotation: '{}'. Valid options are: {:?}", rotation, valid_rotations);
         return Err(format!("Invalid rotation: '{}'. Valid options are: {:?}", rotation, valid_rotations).into());
     }
 
@@ -270,6 +354,7 @@ pub fn wayland_set_rotation(screen: Option<&str>, rotation: &str) -> Result<(), 
         // If a specific screen was provided, filter by that screen
         if let Some(screen_name) = screen {
             if output.name != screen_name {
+                debug!("Skipping output {} as it does not match the specified screen.", output.name);
                 continue; // Skip outputs that do not match the screen name
             }
         }
@@ -281,18 +366,23 @@ pub fn wayland_set_rotation(screen: Option<&str>, rotation: &str) -> Result<(), 
         // Check if the command was executed successfully
         for reply in replies {
             if let Err(error) = reply {
+                error!("Failed to set rotation for output '{}': {}", output.name, error);
                 return Err(format!("Failed to set rotation for output '{}': {}", output.name, error).into());
             }
         }
 
-        println!("Rotation set to '{}' for output '{}'", rotation, output.name);
+        info!("Rotation set to '{}' for output '{}'", rotation, output.name);
     }
 
     Ok(())
 }
 
-// Function to capture a screenshot of the current screen
+/// Captures a screenshot of the current screen.
+///
+/// # Returns
+/// A `Result` indicating success or an error.
 pub fn wayland_get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
+    info!("Capturing screenshot.");
     // Establish connection to Wayland server
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
@@ -325,15 +415,21 @@ pub fn wayland_get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
     // Check if the command was successful
     if !grim_output.status.success() {
         let error_message = String::from_utf8_lossy(&grim_output.stderr);
+        error!("Failed to capture screen: {}", error_message);
         return Err(format!("Failed to capture screen: {}", error_message).into());
     }
 
     println!("Screenshot saved in: {}", file_name);
+    info!("Screenshot saved in: {}", file_name);
     Ok(())
 }
 
-// Function to map a touchscreen to a specific output (screen)
+/// Maps a touchscreen to a specific output (screen).
+///
+/// # Returns
+/// A `Result` indicating success or an error.
 pub fn wayland_map_touch_screen() -> Result<(), Box<dyn std::error::Error>> {
+    info!("Mapping touchscreen to output.");
     // Establish connection to Wayland server
     let mut connection = Connection::new()?;
 
@@ -357,17 +453,25 @@ pub fn wayland_map_touch_screen() -> Result<(), Box<dyn std::error::Error>> {
             // Send an IPC command to map the touchscreen to the output
             let command = format!("input {} map_to_output {}", touchscreen, output);
             connection.run_command(&command)?;
-            println!("Mapped {} to {}", touchscreen, output);
+            info!("Mapped {} to {}", touchscreen, output);
         }
     } else {
-        println!("No touchscreen found.");
+        warn!("No touchscreen found.");
     }
 
     Ok(())
 }
 
-// Function to set the resolution to the maximum allowed within a specified limit
+/// Sets the resolution to the maximum allowed within a specified limit.
+///
+/// # Arguments
+/// * `screen` - An optional screen name to set the resolution for a specific screen.
+/// * `max_resolution` - An optional maximum resolution limit (e.g., "1920x1080").
+///
+/// # Returns
+/// A `Result` indicating success or an error.
 pub fn wayland_min_to_max_resolution(screen: Option<&str>, max_resolution: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+    info!("Setting resolution to maximum within limit for screen: {:?}", screen);
     // Parse the maximum resolution if provided, otherwise default to 1920x1080
     let (max_width, max_height) = if let Some(res) = max_resolution {
         let parts: Vec<&str> = res.split('x').collect();
@@ -400,7 +504,7 @@ pub fn wayland_min_to_max_resolution(screen: Option<&str>, max_resolution: Optio
 
             // Check if the current resolution is already within limits
             if current_width <= max_width && current_height <= max_height {
-                println!("Current resolution {}x{} is already within limits.", current_width, current_height);
+                info!("Current resolution {}x{} is already within limits.", current_width, current_height);
                 return Ok(());
             }
 
@@ -425,24 +529,19 @@ pub fn wayland_min_to_max_resolution(screen: Option<&str>, max_resolution: Optio
                 );
                 for reply in connection.run_command(&command)? {
                     if let Err(error) = reply {
+                        error!("Failed to set resolution for output '{}': {}", output.name, error);
                         return Err(format!(
                             "Failed to set resolution for output '{}': {}",
                             output.name, error
                         ).into());
                     }
                 }
-                println!(
-                    "Resolution set to {}x{} for output '{}'",
-                    mode.width, mode.height, output.name
-                );
+                info!("Resolution set to {}x{} for output '{}'", mode.width, mode.height, output.name);
                 return Ok(());
             }
         }
     }
 
-    println!(
-        "No suitable resolution found within {}x{} limits.",
-        max_width, max_height
-    );
+    warn!("No suitable resolution found within {}x{} limits.", max_width, max_height);
     Ok(())
 }

@@ -3,6 +3,8 @@ use clap::{Arg, Command};
 mod screen;
 
 fn main() {
+    env_logger::init();
+
     let matches = Command::new("regmsg")
         .version("0.0.0")
         .author("REG-Linux")

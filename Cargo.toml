@@ -9,6 +9,8 @@ edition = "2024"
 rust-version = "1.85.1"
 
 [dependencies]
+env_logger = "0.11.7"
+log = "0.4.26"
 clap = "4.5.32"
 drm = "0.14.1"
 swayipc = "3.0.3"
