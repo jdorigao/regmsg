@@ -84,7 +84,7 @@ pub fn list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::error::Er
     info!("Listing display modes for screen: {:?}", screen);
     let result = match detect_backend() {
         "Wayland" => wayland::wayland_list_modes(screen), // Call Wayland-specific function
-        "KMS/DRM" => kmsdrm::drm_list_modes(),            // Call KMS/DRM-specific function
+        "KMS/DRM" => kmsdrm::drm_list_modes(screen),            // Call KMS/DRM-specific function
         _ => {
             warn!("Unknown backend detected.");
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
@@ -127,7 +127,7 @@ pub fn current_mode(screen: Option<&str>) -> Result<String, Box<dyn std::error::
     info!("Fetching current display mode for screen: {:?}", screen);
     let result = match detect_backend() {
         "Wayland" => wayland::wayland_current_mode(screen),
-        "KMS/DRM" => kmsdrm::drm_current_mode(),
+        "KMS/DRM" => kmsdrm::drm_current_mode(screen),
         _ => {
             warn!("Unknown backend detected.");
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
@@ -170,7 +170,7 @@ pub fn current_resolution(screen: Option<&str>) -> Result<String, Box<dyn std::e
     info!("Fetching current resolution for screen: {:?}", screen);
     let result = match detect_backend() {
         "Wayland" => wayland::wayland_current_resolution(screen),
-        "KMS/DRM" => kmsdrm::drm_current_resolution(),
+        "KMS/DRM" => kmsdrm::drm_current_resolution(screen),
         _ => {
             warn!("Unknown backend detected.");
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
@@ -193,7 +193,7 @@ pub fn current_refresh(screen: Option<&str>) -> Result<String, Box<dyn std::erro
     info!("Fetching current refresh rate for screen: {:?}", screen);
     let result = match detect_backend() {
         "Wayland" => wayland::wayland_current_refresh(screen),
-        "KMS/DRM" => kmsdrm::drm_current_refresh(),
+        "KMS/DRM" => kmsdrm::drm_current_refresh(screen),
         _ => {
             warn!("Unknown backend detected.");
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
@@ -220,7 +220,7 @@ pub fn set_mode(screen: Option<&str>, mode: &str) -> Result<(), Box<dyn std::err
         let max_resolution = mode.trim_start_matches("max-").to_string();
         match detect_backend() {
             "Wayland" => wayland::wayland_min_to_max_resolution(screen, Some(max_resolution))?,
-            "KMS/DRM" => kmsdrm::drm_to_max_resolution(Some(max_resolution))?,
+            "KMS/DRM" => kmsdrm::drm_to_max_resolution(screen, Some(max_resolution))?,
             _ => {
                 warn!("Unknown backend detected.");
                 println!("Unknown backend. Unable to determine display settings.");
@@ -230,7 +230,7 @@ pub fn set_mode(screen: Option<&str>, mode: &str) -> Result<(), Box<dyn std::err
         let mode_set = parse_mode(mode)?; // Parse the mode string into components
         match detect_backend() {
             "Wayland" => wayland::wayland_set_mode(screen, mode_set.width, mode_set.height, mode_set.vrefresh)?,
-            "KMS/DRM" => kmsdrm::drm_set_mode(mode_set.width, mode_set.height, mode_set.vrefresh)?,
+            "KMS/DRM" => kmsdrm::drm_set_mode(screen, mode_set.width, mode_set.height, mode_set.vrefresh)?,
             _ => {
                 warn!("Unknown backend detected.");
                 println!("Unknown backend. Unable to determine display settings.");
@@ -276,7 +276,7 @@ pub fn set_rotation(screen: Option<&str>, rotation: &str) -> Result<(), Box<dyn 
     info!("Setting rotation for screen: {:?} to {}", screen, rotation);
     match detect_backend() {
         "Wayland" => wayland::wayland_set_rotation(screen, rotation)?,
-        "KMS/DRM" => kmsdrm::drm_set_rotation(rotation)?,
+        "KMS/DRM" => kmsdrm::drm_set_rotation(screen, rotation)?,
         _ => {
             warn!("Unknown backend detected.");
             println!("Unknown backend. Unable to determine display settings.");
@@ -342,7 +342,7 @@ pub fn min_to_max_resolution(screen: Option<&str>) -> Result<(), Box<dyn std::er
 
     match detect_backend() {
         "Wayland" => wayland::wayland_min_to_max_resolution(screen, Some(max_resolution))?,
-        "KMS/DRM" => kmsdrm::drm_to_max_resolution(Some(max_resolution))?,
+        "KMS/DRM" => kmsdrm::drm_to_max_resolution(screen, Some(max_resolution))?,
         _ => {
             warn!("Unknown backend detected.");
             println!("Unknown backend. Unable to determine display settings.");
