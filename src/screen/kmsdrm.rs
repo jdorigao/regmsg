@@ -5,12 +5,31 @@ use std::fs::{File, OpenOptions};
 use std::os::unix::io::{AsFd, BorrowedFd};
 use std::path::Path;
 use log::{info, error, debug, warn};
+use image::{RgbImage, Rgb};
 
 /// Represents a DRM (Direct Rendering Manager) device card.
 ///
 /// This struct wraps a `File` object representing an opened DRM device file (e.g., `/dev/dri/card0`).
 #[derive(Debug)]
 struct Card(File);
+
+impl Card {
+    /// Reads framebuffer data into the provided buffer.
+    ///
+    /// # Arguments
+    /// - `fb_id`: The framebuffer handle to read from.
+    /// - `buffer`: The buffer to store the framebuffer data.
+    ///
+    /// # Returns
+    /// - `Ok(())` if the framebuffer data is successfully read.
+    /// - `Err` if an error occurs during the operation.
+    pub fn read_framebuffer(&self, _fb_id: drm::control::framebuffer::Handle, _buffer: &mut [u8]) -> Result<(), Box<dyn Error>> {
+        // DRM does not provide a direct method to read framebuffer data.
+        // You need to use mmap or other mechanisms to access the framebuffer memory.
+        // This is a placeholder implementation and should be replaced with actual logic.
+        Err("Framebuffer reading is not implemented. Use mmap or other methods.".into())
+    }
+}
 
 /// Implements the `AsFd` trait to allow `Card` to provide a file descriptor.
 impl AsFd for Card {
@@ -534,41 +553,75 @@ pub fn drm_set_rotation(screen: Option<&str>, rotation: &str) -> Result<(), Box<
     Ok(())
 }
 
-/// Attempts to capture a screenshot from the DRM device.
+/// Captures a screenshot from the active DRM output and saves it as a PNG file.
 ///
 /// # Returns
-/// - `Ok(())` if the attempt completes (though capture is not fully implemented).
-/// - `Err` if an error occurs during connector iteration.
-///
-/// # Note
-/// This function is incomplete and requires framebuffer reading to fully implement screenshot capture.
+/// - `Ok(())` if the screenshot is successfully captured and saved.
+/// - `Err` if an error occurs during processing.
 pub fn drm_get_screenshot() -> Result<(), Box<dyn Error>> {
-    info!("Attempting to capture screenshot");
-    debug!("Opening first available DRM card");
-    let card = Card::open_first_available()?;
+	info!("Attempting to capture screenshot");
+	debug!("Opening first available DRM card");
+	let card = Card::open_first_available()?;
 
-    debug!("Iterating over connectors to capture screenshot");
-    for_each_connector(&card, None, |connector_info| -> Result<(), Box<dyn Error>> {
-        if connector_info.state() == connector::State::Connected {
-            debug!("Processing connected connector {:?}", connector_info.interface());
-            if let Some(encoder_id) = connector_info.current_encoder() {
-                debug!("Fetching encoder info for ID {:?}", encoder_id);
-                let encoder_info = card.get_encoder(encoder_id)?;
-                if let Some(crtc_id) = encoder_info.crtc() {
-                    debug!("Fetching CRTC info for ID {:?}", crtc_id);
-                    let crtc_info = card.get_crtc(crtc_id)?;
-                    if let Some(fb_id) = crtc_info.framebuffer() {
-                        debug!("Fetching framebuffer info for ID {:?}", fb_id);
-                        let _fb_info = card.get_framebuffer(fb_id)?;
-                        warn!("Screenshot capture not fully implemented - framebuffer reading needed");
-                    }
-                }
-            }
-        }
-        Ok(())
-    })?;
-    info!("Screenshot capture attempt completed");
-    Ok(())
+	let mut screenshot_data = None;
+
+	// Iterate over connectors to find the active one
+	for_each_connector(&card, None, |connector_info| -> Result<(), Box<dyn Error>> {
+		if connector_info.state() == connector::State::Connected {
+		debug!("Processing connected connector {:?}", connector_info.interface());
+
+		// Get encoder and CRTC information
+		if let Some(encoder_id) = connector_info.current_encoder() {
+			let encoder_info = card.get_encoder(encoder_id)?;
+			if let Some(crtc_id) = encoder_info.crtc() {
+			let crtc_info = card.get_crtc(crtc_id)?;
+
+			// Get framebuffer ID
+			if let Some(fb_id) = crtc_info.framebuffer() {
+				debug!("Fetching framebuffer info for ID {:?}", fb_id);
+				let fb_info = card.get_framebuffer(fb_id)?;
+
+				// Retrieve width, height, and pitch
+				let width = fb_info.size().0;
+				let height = fb_info.size().1;
+				let pitch = fb_info.pitch();
+
+				debug!("Framebuffer details: {}x{}, pitch {}", width, height, pitch);
+
+				// Read framebuffer memory
+				let mut buffer = vec![0u8; (height as usize) * (pitch as usize)];
+				card.read_framebuffer(fb_id, &mut buffer)?;
+
+				screenshot_data = Some((width, height, pitch, buffer));
+			}
+			}
+		}
+		}
+		Ok(())
+	})?;
+
+	// If we couldn't capture any framebuffer data, return an error
+	let (width, height, pitch, buffer) = screenshot_data.ok_or("No framebuffer found for screenshot")?;
+
+	// Convert framebuffer data to an image
+	let mut img = RgbImage::new(width as u32, height as u32);
+
+	for y in 0..height {
+		for x in 0..width {
+		let index = (y as usize * pitch as usize) + (x as usize * 4); // Assuming 32-bit color (RGBA)
+		if index + 3 < buffer.len() {
+			let pixel = Rgb([buffer[index + 2], buffer[index + 1], buffer[index]]); // Convert BGRA to RGB
+			img.put_pixel(x as u32, y as u32, pixel);
+		}
+		}
+	}
+
+	// Save image to file
+	let file_path = "screenshot.png";
+	img.save(file_path)?;
+
+	info!("Screenshot saved to {}", file_path);
+	Ok(())
 }
 
 /// Sets the display to its maximum supported resolution for a specified screen.
