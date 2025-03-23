@@ -26,14 +26,6 @@ impl Device for Card {}
 impl ControlDevice for Card {}
 
 impl Card {
-    /// Opens the first available DRM device found in `/dev/dri/`.
-    ///
-    /// Scans the `/dev/dri/` directory for files starting with "card" (e.g., `card0`, `card1`),
-    /// attempting to open them with read/write permissions.
-    ///
-    /// # Returns
-    /// - `Ok(Card)` if a device is successfully opened.
-    /// - `Err` if no DRM device is found or all attempts to open devices fail.
     fn open_first_available() -> Result<Self, Box<dyn Error>> {
         let dri_path = Path::new("/dev/dri/");
         info!("Searching for DRM devices in {:?}", dri_path);
@@ -46,7 +38,7 @@ impl Card {
                 if file_name.to_string_lossy().starts_with("card") {
                     debug!("Trying to open device: {:?}", path);
                     let mut options = OpenOptions::new();
-                    options.read(true).write(true); // Set read/write permissions
+                    options.read(true).write(true);
                     match options.open(&path) {
                         Ok(file) => {
                             info!("Successfully opened DRM device: {:?}", path);
@@ -63,37 +55,56 @@ impl Card {
     }
 }
 
-/// Iterates over all connectors of a DRM device and applies a given function to each.
+/// Iterates over all available connectors of the DRM device, applying a given function.
 ///
 /// # Arguments
-/// - `drm_device`: The DRM device to query connectors from.
-/// - `screen`: Optional filter to process only connectors matching this screen name.
-/// - `f`: A closure to execute on each connector's information.
+/// - `drm_device`: A reference to the `Card` representing the DRM device.
+/// - `screen`: An optional screen name to filter connectors (e.g., "HDMI", "DP").
+/// - `f`: A function that is executed for each connector found.
 ///
 /// # Returns
 /// - `Ok(())` if iteration completes successfully.
-/// - `Err` if an error occurs while fetching connector information.
+/// - `Err(Box<dyn Error>)` if any error occurs during connector processing.
 fn for_each_connector<F>(drm_device: &Card, screen: Option<&str>, mut f: F) -> Result<(), Box<dyn Error>>
 where
     F: FnMut(&connector::Info) -> Result<(), Box<dyn Error>>,
 {
     debug!("Fetching resource handles for DRM device");
-    let resources = drm_device.resource_handles()?;
-    debug!("Found {} connectors", resources.connectors().len());
 
-    for connector in resources.connectors() {
-        debug!("Retrieving info for connector {:?}", connector);
-        let connector_info = drm_device.get_connector(*connector, true)?;
-        if let Some(screen_name) = screen {
-            let interface_str = format!("{:?}-{:?}", connector_info.interface(), connector_info.interface_id());
-            if !interface_str.contains(screen_name) {
-                debug!("Skipping connector {} - doesn't match screen {}", interface_str, screen_name);
-                continue;
+    // Retrieve all connectors once
+    let resources = drm_device.resource_handles()?;
+    let connectors = resources.connectors();
+
+    debug!("Found {} connectors", connectors.len());
+
+    connectors.iter()
+        .filter_map(|&connector_handle| {
+            // Fetch connector info; return None if failed (prevents unnecessary processing)
+            match drm_device.get_connector(connector_handle, true) {
+                Ok(connector_info) => Some(connector_info),
+                Err(e) => {
+                    warn!("Failed to get info for connector {:?}: {}", connector_handle, e);
+                    None
+                }
             }
-            debug!("Connector {} matches screen filter {}", interface_str, screen_name);
-        }
-        f(&connector_info)?;
-    }
+        })
+        .filter(|connector_info| {
+            // If a screen filter is specified, check if the connector matches using direct comparison
+            match screen {
+                Some(screen_name) if format!("{:?}", connector_info.interface()) != screen_name => {
+                    debug!(
+                        "Skipping connector {:?}-{:?} - doesn't match screen {}",
+                        connector_info.interface(),
+                        connector_info.interface_id(),
+                        screen_name
+                    );
+                    false
+                }
+                _ => true, // Process all connectors if no filter is applied
+            }
+        })
+        .try_for_each(|connector_info| f(&connector_info))?; // Apply function `f` to each valid connector
+
     debug!("Connector iteration completed successfully");
     Ok(())
 }
