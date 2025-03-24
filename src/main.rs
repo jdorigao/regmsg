@@ -7,7 +7,7 @@ fn main() {
 
     let matches = Command::new("regmsg")
         .version("0.0.0")
-        .author("REG-Linux")
+        .author("Juliano Dorigão")
         .about("A tool to manage screen resolution and display settings.")
         .arg(
             Arg::new("screen")

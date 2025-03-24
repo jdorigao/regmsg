@@ -1,6 +1,5 @@
 use drm::Device;
 use drm::control::{Device as ControlDevice, connector};
-use image::{Rgb, RgbImage};
 use log::{debug, error, info, warn};
 use std::error::Error;
 use std::fs::{File, OpenOptions};
@@ -10,32 +9,13 @@ use std::path::Path;
 /// Represents a DRM (Direct Rendering Manager) device card.
 ///
 /// This struct wraps a `File` object representing an opened DRM device file (e.g., `/dev/dri/card0`).
+/// It provides a simple abstraction for interacting with DRM devices.
 #[derive(Debug)]
 struct Card(File);
 
-impl Card {
-    /// Reads framebuffer data into the provided buffer.
-    ///
-    /// # Arguments
-    /// - `fb_id`: The framebuffer handle to read from.
-    /// - `buffer`: The buffer to store the framebuffer data.
-    ///
-    /// # Returns
-    /// - `Ok(())` if the framebuffer data is successfully read.
-    /// - `Err` if an error occurs during the operation.
-    pub fn read_framebuffer(
-        &self,
-        _fb_id: drm::control::framebuffer::Handle,
-        _buffer: &mut [u8],
-    ) -> Result<(), Box<dyn Error>> {
-        // DRM does not provide a direct method to read framebuffer data.
-        // You need to use mmap or other mechanisms to access the framebuffer memory.
-        // This is a placeholder implementation and should be replaced with actual logic.
-        Err("Framebuffer reading is not implemented. Use mmap or other methods.".into())
-    }
-}
-
 /// Implements the `AsFd` trait to allow `Card` to provide a file descriptor.
+///
+/// This is necessary for low-level operations that require access to the file descriptor.
 impl AsFd for Card {
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.0.as_fd()
@@ -43,12 +23,23 @@ impl AsFd for Card {
 }
 
 /// Implements the `Device` trait for `Card`, enabling basic DRM operations.
+///
+/// This trait provides the foundational DRM functionality, such as resource management.
 impl Device for Card {}
 
 /// Implements the `ControlDevice` trait for `Card`, enabling control-specific DRM operations.
+///
+/// This trait allows for advanced control over connectors, CRTCs, and other DRM components.
 impl ControlDevice for Card {}
 
 impl Card {
+    /// Opens the first available DRM device found in `/dev/dri/`.
+    ///
+    /// Iterates through directory entries in `/dev/dri/` and attempts to open a file starting with "card".
+    ///
+    /// # Returns
+    /// - `Ok(Card)` if a device is successfully opened.
+    /// - `Err(Box<dyn Error>)` if no DRM device is found or accessible.
     fn open_first_available() -> Result<Self, Box<dyn Error>> {
         let dri_path = Path::new("/dev/dri/");
         info!("Searching for DRM devices in {:?}", dri_path);
@@ -61,7 +52,7 @@ impl Card {
                 if file_name.to_string_lossy().starts_with("card") {
                     debug!("Trying to open device: {:?}", path);
                     let mut options = OpenOptions::new();
-                    options.read(true).write(true);
+                    options.read(true).write(true); // Open with read/write permissions
                     match options.open(&path) {
                         Ok(file) => {
                             info!("Successfully opened DRM device: {:?}", path);
@@ -80,14 +71,16 @@ impl Card {
 
 /// Iterates over all available connectors of the DRM device, applying a given function.
 ///
+/// This function retrieves connector information and filters based on an optional screen name.
+///
 /// # Arguments
 /// - `drm_device`: A reference to the `Card` representing the DRM device.
 /// - `screen`: An optional screen name to filter connectors (e.g., "HDMI", "DP").
-/// - `f`: A function that is executed for each connector found.
+/// - `f`: A closure that is executed for each valid connector found.
 ///
 /// # Returns
 /// - `Ok(())` if iteration completes successfully.
-/// - `Err(Box<dyn Error>)` if any error occurs during connector processing.
+/// - `Err(Box<dyn Error>)` if an error occurs during connector processing.
 fn for_each_connector<F>(
     drm_device: &Card,
     screen: Option<&str>,
@@ -98,7 +91,7 @@ where
 {
     debug!("Fetching resource handles for DRM device");
 
-    // Retrieve all connectors once
+    // Retrieve all connectors once to avoid repeated queries
     let resources = drm_device.resource_handles()?;
     let connectors = resources.connectors();
 
@@ -107,7 +100,7 @@ where
     connectors
         .iter()
         .filter_map(|&connector_handle| {
-            // Fetch connector info; return None if failed (prevents unnecessary processing)
+            // Fetch connector info; skip if failed
             match drm_device.get_connector(connector_handle, true) {
                 Ok(connector_info) => Some(connector_info),
                 Err(e) => {
@@ -120,7 +113,7 @@ where
             }
         })
         .filter(|connector_info| {
-            // If a screen filter is specified, check if the connector matches using direct comparison
+            // Apply screen filter if provided
             match screen {
                 Some(screen_name) if format!("{:?}", connector_info.interface()) != screen_name => {
                     debug!(
@@ -131,10 +124,10 @@ where
                     );
                     false
                 }
-                _ => true, // Process all connectors if no filter is applied
+                _ => true, // No filter means process all connectors
             }
         })
-        .try_for_each(|connector_info| f(&connector_info))?; // Apply function `f` to each valid connector
+        .try_for_each(|connector_info| f(&connector_info))?; // Execute the provided function
 
     debug!("Connector iteration completed successfully");
     Ok(())
@@ -142,18 +135,21 @@ where
 
 /// Lists all available display modes for a specified screen.
 ///
+/// Includes both hardcoded maximum resolutions and connector-specific modes.
+///
 /// # Arguments
 /// - `screen`: Optional screen name to filter modes (e.g., "HDMI", "DP").
 ///
 /// # Returns
-/// - A string containing all available modes, including hardcoded maximums and connector-specific modes.
+/// - `Ok(String)` containing all available modes in a formatted string.
+/// - `Err(Box<dyn Error>)` if an error occurs while accessing the DRM device.
 pub fn drm_list_modes(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
     info!("Listing display modes for screen: {:?}", screen);
     debug!("Opening first available DRM card");
     let card = Card::open_first_available()?;
     let mut modes_string = String::new();
 
-    // Add hardcoded maximum resolutions
+    // Add hardcoded maximum resolutions as fallback options
     debug!("Adding hardcoded maximum resolutions");
     modes_string.push_str(&format!("{}", "max-1920x1080:maximum 1920x1080"));
     modes_string.push_str(&format!("\n{}", "max-640x480:maximum 640x480"));
@@ -195,13 +191,14 @@ pub fn drm_list_modes(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
 /// Lists all available outputs (connectors) on the DRM device.
 ///
 /// # Returns
-/// - A string listing all connector names (e.g., "HDMI-A-1", "DP-1").
+/// - `Ok(String)` listing all connector names (e.g., "HDMI-A-1", "DP-1").
+/// - `Err(Box<dyn Error>)` if an error occurs while accessing the DRM device.
 pub fn drm_list_outputs() -> Result<String, Box<dyn Error>> {
     info!("Listing available outputs");
     debug!("Opening first available DRM card");
     let card = Card::open_first_available()?;
     let mut outputs_string = String::new();
-    let mut first = true; // Flag to control line breaks
+    let mut first = true; // Used to avoid leading newline
 
     debug!("Iterating over connectors to list outputs");
     for_each_connector(&card, None, |connector_info| {
@@ -213,7 +210,7 @@ pub fn drm_list_outputs() -> Result<String, Box<dyn Error>> {
         debug!("Found output: {}", output_str);
 
         if !first {
-            outputs_string.push_str("\n"); // Add newline before all but the first output
+            outputs_string.push_str("\n");
         }
         outputs_string.push_str(&output_str);
         first = false;
@@ -232,10 +229,11 @@ pub fn drm_list_outputs() -> Result<String, Box<dyn Error>> {
 /// Retrieves the current display mode for a specified screen.
 ///
 /// # Arguments
-/// - `screen`: Optional screen name to filter the mode.
+/// - `screen`: Optional screen name to filter the mode (e.g., "HDMI", "DP").
 ///
 /// # Returns
-/// - A string in the format "WIDTHxHEIGHT@REFRESH_RATE" (e.g., "1920x1080@60Hz").
+/// - `Ok(String)` in the format "WIDTHxHEIGHT@REFRESH_RATE" (e.g., "1920x1080@60Hz").
+/// - `Err(Box<dyn Error>)` if an error occurs or no mode is found.
 pub fn drm_current_mode(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
     info!("Getting current mode for screen: {:?}", screen);
     debug!("Opening first available DRM card");
@@ -290,7 +288,8 @@ pub fn drm_current_mode(screen: Option<&str>) -> Result<String, Box<dyn Error>> 
 /// Retrieves the currently active output (connected connector).
 ///
 /// # Returns
-/// - A string with the name of the connected output (e.g., "HDMI-A-1").
+/// - `Ok(String)` with the name of the connected output (e.g., "HDMI-A-1").
+/// - `Err(Box<dyn Error>)` if an error occurs or no connected output is found.
 pub fn drm_current_output() -> Result<String, Box<dyn Error>> {
     info!("Getting current output");
     debug!("Opening first available DRM card");
@@ -327,10 +326,11 @@ pub fn drm_current_output() -> Result<String, Box<dyn Error>> {
 /// Retrieves the current resolution for a specified screen.
 ///
 /// # Arguments
-/// - `screen`: Optional screen name to filter the resolution.
+/// - `screen`: Optional screen name to filter the resolution (e.g., "HDMI", "DP").
 ///
 /// # Returns
-/// - A string in the format "WIDTHxHEIGHT" (e.g., "1920x1080").
+/// - `Ok(String)` in the format "WIDTHxHEIGHT" (e.g., "1920x1080").
+/// - `Err(Box<dyn Error>)` if an error occurs or no resolution is found.
 pub fn drm_current_resolution(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
     info!("Getting current resolution for screen: {:?}", screen);
     debug!("Opening first available DRM card");
@@ -381,10 +381,11 @@ pub fn drm_current_resolution(screen: Option<&str>) -> Result<String, Box<dyn Er
 /// Retrieves the current refresh rate for a specified screen.
 ///
 /// # Arguments
-/// - `screen`: Optional screen name to filter the refresh rate.
+/// - `screen`: Optional screen name to filter the refresh rate (e.g., "HDMI", "DP").
 ///
 /// # Returns
-/// - A string in the format "REFRESH_RATEHz" (e.g., "60Hz").
+/// - `Ok(String)` in the format "REFRESH_RATEHz" (e.g., "60Hz").
+/// - `Err(Box<dyn Error>)` if an error occurs or no refresh rate is found.
 pub fn drm_current_refresh(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
     info!("Getting current refresh rate for screen: {:?}", screen);
     debug!("Opening first available DRM card");
@@ -431,15 +432,17 @@ pub fn drm_current_refresh(screen: Option<&str>) -> Result<String, Box<dyn Error
 
 /// Sets a specific display mode (resolution and refresh rate) for a screen.
 ///
+/// Applies the mode to the first matching connected connector.
+///
 /// # Arguments
-/// - `screen`: Optional screen name to apply the mode to.
+/// - `screen`: Optional screen name to apply the mode to (e.g., "HDMI", "DP").
 /// - `width`: Desired width in pixels.
 /// - `height`: Desired height in pixels.
 /// - `vrefresh`: Desired refresh rate in Hz.
 ///
 /// # Returns
 /// - `Ok(())` if the mode is set successfully.
-/// - `Err` if no matching mode is found.
+/// - `Err(Box<dyn Error>)` if no matching mode is found or an error occurs.
 pub fn drm_set_mode(
     screen: Option<&str>,
     width: i32,
@@ -528,7 +531,7 @@ pub fn drm_set_mode(
 ///
 /// # Returns
 /// - `Ok(())` if the output is set successfully.
-/// - `Err` if the specified output is not found.
+/// - `Err(Box<dyn Error>)` if the specified output is not found or an error occurs.
 pub fn drm_set_output(output: &str) -> Result<(), Box<dyn Error>> {
     info!("Setting output to {}", output);
     debug!("Opening first available DRM card");
@@ -581,13 +584,15 @@ pub fn drm_set_output(output: &str) -> Result<(), Box<dyn Error>> {
 
 /// Sets the rotation of a specified screen.
 ///
+/// Applies the rotation to the first matching connected connector with a "rotation" property.
+///
 /// # Arguments
 /// - `screen`: Optional screen name to apply the rotation to (e.g., "HDMI", "DP").
-/// - `rotation`: The rotation value ("0", "90", "180", "270").
+/// - `rotation`: The rotation value as a string ("0", "90", "180", "270").
 ///
 /// # Returns
 /// - `Ok(())` if the rotation is set successfully.
-/// - `Err` if the rotation value is invalid or no matching screen is found.
+/// - `Err(Box<dyn Error>)` if the rotation value is invalid or no matching screen is found.
 pub fn drm_set_rotation(screen: Option<&str>, rotation: &str) -> Result<(), Box<dyn Error>> {
     info!(
         "Starting rotation setting process for rotation '{}' on screen {:?}",
@@ -596,6 +601,7 @@ pub fn drm_set_rotation(screen: Option<&str>, rotation: &str) -> Result<(), Box<
     debug!("Opening first available DRM card");
     let card = Card::open_first_available()?;
 
+    // Map rotation string to integer value
     debug!("Parsing rotation input: '{}'", rotation);
     let rotation_value = match rotation.to_lowercase().as_str() {
         "0" => 0,
@@ -639,6 +645,7 @@ pub fn drm_set_rotation(screen: Option<&str>, rotation: &str) -> Result<(), Box<
                     );
                 }
 
+                // Check properties for "rotation"
                 debug!(
                     "Fetching properties for connector handle {:?}",
                     connector_info.handle()
@@ -695,94 +702,28 @@ pub fn drm_set_rotation(screen: Option<&str>, rotation: &str) -> Result<(), Box<
     Ok(())
 }
 
-/// Captures a screenshot from the active DRM output and saves it as a PNG file.
+/// Retrieves a screenshot from the DRM device.
 ///
 /// # Returns
-/// - `Ok(())` if the screenshot is successfully captured and saved.
-/// - `Err` if an error occurs during processing.
+/// - `Result<(), Box<dyn Error>>` (currently unimplemented).
+///
+/// # Notes
+/// - This function is a placeholder and needs implementation.
 pub fn drm_get_screenshot() -> Result<(), Box<dyn Error>> {
-    info!("Attempting to capture screenshot");
-    debug!("Opening first available DRM card");
-    let card = Card::open_first_available()?;
-
-    let mut screenshot_data = None;
-
-    // Iterate over connectors to find the active one
-    for_each_connector(
-        &card,
-        None,
-        |connector_info| -> Result<(), Box<dyn Error>> {
-            if connector_info.state() == connector::State::Connected {
-                debug!(
-                    "Processing connected connector {:?}",
-                    connector_info.interface()
-                );
-
-                // Get encoder and CRTC information
-                if let Some(encoder_id) = connector_info.current_encoder() {
-                    let encoder_info = card.get_encoder(encoder_id)?;
-                    if let Some(crtc_id) = encoder_info.crtc() {
-                        let crtc_info = card.get_crtc(crtc_id)?;
-
-                        // Get framebuffer ID
-                        if let Some(fb_id) = crtc_info.framebuffer() {
-                            debug!("Fetching framebuffer info for ID {:?}", fb_id);
-                            let fb_info = card.get_framebuffer(fb_id)?;
-
-                            // Retrieve width, height, and pitch
-                            let width = fb_info.size().0;
-                            let height = fb_info.size().1;
-                            let pitch = fb_info.pitch();
-
-                            debug!("Framebuffer details: {}x{}, pitch {}", width, height, pitch);
-
-                            // Read framebuffer memory
-                            let mut buffer = vec![0u8; (height as usize) * (pitch as usize)];
-                            card.read_framebuffer(fb_id, &mut buffer)?;
-
-                            screenshot_data = Some((width, height, pitch, buffer));
-                        }
-                    }
-                }
-            }
-            Ok(())
-        },
-    )?;
-
-    // If we couldn't capture any framebuffer data, return an error
-    let (width, height, pitch, buffer) =
-        screenshot_data.ok_or("No framebuffer found for screenshot")?;
-
-    // Convert framebuffer data to an image
-    let mut img = RgbImage::new(width as u32, height as u32);
-
-    for y in 0..height {
-        for x in 0..width {
-            let index = (y as usize * pitch as usize) + (x as usize * 4); // Assuming 32-bit color (RGBA)
-            if index + 3 < buffer.len() {
-                let pixel = Rgb([buffer[index + 2], buffer[index + 1], buffer[index]]); // Convert BGRA to RGB
-                img.put_pixel(x as u32, y as u32, pixel);
-            }
-        }
-    }
-
-    // Save image to file
-    let file_path = "screenshot.png";
-    img.save(file_path)?;
-
-    info!("Screenshot saved to {}", file_path);
-    Ok(())
+    Err("TODO: Needs implementation.".into())
 }
 
 /// Sets the display to its maximum supported resolution for a specified screen.
 ///
+/// Automatically detects and applies the highest resolution available.
+///
 /// # Arguments
-/// - `screen`: Optional screen name to apply the maximum resolution to.
+/// - `screen`: Optional screen name to apply the maximum resolution to (e.g., "HDMI", "DP").
 /// - `_max_resolution`: Currently unused optional parameter for a specific max resolution.
 ///
 /// # Returns
 /// - `Ok(())` if the maximum resolution is set successfully.
-/// - `Err` if no suitable resolution is found.
+/// - `Err(Box<dyn Error>)` if no suitable resolution is found or an error occurs.
 pub fn drm_to_max_resolution(
     screen: Option<&str>,
     _max_resolution: Option<String>,
@@ -795,7 +736,7 @@ pub fn drm_to_max_resolution(
     let mut best_mode = None;
     let mut target_connector = None;
 
-    // Find the highest resolution mode available
+    // First pass: find the highest resolution mode
     debug!("Iterating over connectors to find maximum resolution");
     for_each_connector(
         &card,
@@ -830,7 +771,7 @@ pub fn drm_to_max_resolution(
         },
     )?;
 
-    // Apply the best mode found
+    // Second pass: apply the best mode found
     if let (Some(mode), Some(connector_handle)) = (best_mode, target_connector) {
         debug!("Best mode found: {}x{}", max_width, max_height);
         debug!("Iterating over connectors to apply maximum resolution");

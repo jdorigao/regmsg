@@ -15,7 +15,6 @@ clap = "4.5.32"
 drm = "0.14.1"
 swayipc = "3.0.3"
 chrono = "0.4.40"
-image = "0.25.5"
 
 [profile.release]
 lto = true          # Enable LTO.
