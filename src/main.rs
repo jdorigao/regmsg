@@ -69,9 +69,14 @@ fn main() {
             let rotation = sub_matches.get_one::<String>("ROTATION").unwrap();
             screen::set_rotation(screen, rotation).map(|_| "Rotation set successfully".to_string())
         }
-        Some(("getScreenshot", _)) => screen::get_screenshot().map(|_| "Screenshot taken successfully".to_string()),
-        Some(("mapTouchScreen", _)) => screen::map_touch_screen().map(|_| "Touch screen successfully mapped".to_string()),
-        Some(("minTomaxResolution", _)) => screen::min_to_max_resolution(screen).map(|_| "Resolution set to maximum successfully".to_string()),
+        Some(("getScreenshot", _)) => {
+            screen::get_screenshot().map(|_| "Screenshot taken successfully".to_string())
+        }
+        Some(("mapTouchScreen", _)) => {
+            screen::map_touch_screen().map(|_| "Touch screen successfully mapped".to_string())
+        }
+        Some(("minTomaxResolution", _)) => screen::min_to_max_resolution(screen)
+            .map(|_| "Resolution set to maximum successfully".to_string()),
         _ => {
             eprintln!("Invalid command. Use --help for usage information.");
             std::process::exit(1);

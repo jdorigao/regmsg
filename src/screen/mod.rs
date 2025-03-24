@@ -1,5 +1,5 @@
+use log::{debug, error, info, warn};
 use std::env;
-use log::{info, debug, warn, error};
 
 mod kmsdrm;
 mod wayland;
@@ -61,13 +61,19 @@ fn parse_mode(mode: &str) -> Result<ModeInfo, Box<dyn std::error::Error>> {
     let width = parts[0].parse::<i32>().map_err(|_| "Invalid width")?;
     let height = parts[1].parse::<i32>().map_err(|_| "Invalid height")?;
     let vrefresh = if parts.len() == 3 {
-        parts[2].parse::<i32>().map_err(|_| "Invalid refresh rate")?
+        parts[2]
+            .parse::<i32>()
+            .map_err(|_| "Invalid refresh rate")?
     } else {
         60 // Default refresh rate if not specified
     };
 
     debug!("Parsed mode: {}x{}@{}", width, height, vrefresh);
-    Ok(ModeInfo { width, height, vrefresh })
+    Ok(ModeInfo {
+        width,
+        height,
+        vrefresh,
+    })
 }
 
 /// Lists available display modes for the specified screen.
@@ -84,7 +90,7 @@ pub fn list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::error::Er
     info!("Listing display modes for screen: {:?}", screen);
     let result = match detect_backend() {
         "Wayland" => wayland::wayland_list_modes(screen), // Call Wayland-specific function
-        "KMS/DRM" => kmsdrm::drm_list_modes(screen),            // Call KMS/DRM-specific function
+        "KMS/DRM" => kmsdrm::drm_list_modes(screen),      // Call KMS/DRM-specific function
         _ => {
             warn!("Unknown backend detected.");
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
@@ -229,8 +235,15 @@ pub fn set_mode(screen: Option<&str>, mode: &str) -> Result<(), Box<dyn std::err
     } else {
         let mode_set = parse_mode(mode)?; // Parse the mode string into components
         match detect_backend() {
-            "Wayland" => wayland::wayland_set_mode(screen, mode_set.width, mode_set.height, mode_set.vrefresh)?,
-            "KMS/DRM" => kmsdrm::drm_set_mode(screen, mode_set.width, mode_set.height, mode_set.vrefresh)?,
+            "Wayland" => wayland::wayland_set_mode(
+                screen,
+                mode_set.width,
+                mode_set.height,
+                mode_set.vrefresh,
+            )?,
+            "KMS/DRM" => {
+                kmsdrm::drm_set_mode(screen, mode_set.width, mode_set.height, mode_set.vrefresh)?
+            }
             _ => {
                 warn!("Unknown backend detected.");
                 println!("Unknown backend. Unable to determine display settings.");
@@ -272,7 +285,10 @@ pub fn set_output(output: &str) -> Result<(), Box<dyn std::error::Error>> {
 ///
 /// # Returns
 /// A `Result` indicating success or an error message if the operation fails.
-pub fn set_rotation(screen: Option<&str>, rotation: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn set_rotation(
+    screen: Option<&str>,
+    rotation: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     info!("Setting rotation for screen: {:?} to {}", screen, rotation);
     match detect_backend() {
         "Wayland" => wayland::wayland_set_rotation(screen, rotation)?,
