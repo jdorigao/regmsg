@@ -3,6 +3,24 @@ use log::{debug, error, info, warn};
 use std::fs;
 use std::process::Command;
 use swayipc::{Connection, Mode, Output};
+use std::collections::HashMap;
+
+/// Pre-processes a vector of outputs into a HashMap for efficient lookup by name.
+///
+/// This function creates a mapping from output names to their corresponding `Output` objects,
+/// allowing O(1) access instead of iterating over the list repeatedly.
+///
+/// # Arguments
+/// * `outputs` - A vector of `Output` objects to preprocess.
+///
+/// # Returns
+/// A `HashMap` where the key is the output name (`String`) and the value is the `Output` object.
+///
+/// # Performance
+/// This runs in O(n) time to build the map, but enables constant-time lookups later.
+fn preprocess_outputs(outputs: Vec<Output>) -> HashMap<String, Output> {
+    outputs.into_iter().map(|output| (output.name.clone(), output)).collect()
+}
 
 /// Converts a refresh rate from mHz to Hz if applicable.
 ///
@@ -344,24 +362,32 @@ pub fn wayland_current_refresh(screen: Option<&str>) -> Result<String, Box<dyn s
 
 /// Sets a specific display mode (resolution and refresh rate) for a screen.
 ///
-/// This function sets the display mode for the specified screen (or all screens if none specified)
-/// to the given resolution and refresh rate, using `filter_outputs` to target relevant outputs.
+/// This optimized version uses a `HashMap` to avoid repeated iterations over outputs,
+/// improving performance in scenarios with many screens. It targets either a specific screen
+/// or all available screens if none is specified.
 ///
 /// # Arguments
-/// * `screen` - An optional screen name to set the mode for a specific screen (e.g., "eDP-1").
-/// * `width` - The width of the resolution (e.g., 1920).
-/// * `height` - The height of the resolution (e.g., 1080).
-/// * `vrefresh` - The vertical refresh rate in Hz (e.g., 60).
+/// * `screen` - An optional screen name to set the mode for (e.g., `"eDP-1"`). If `None`, applies to all screens.
+/// * `width` - The width of the resolution (e.g., `1920`).
+/// * `height` - The height of the resolution (e.g., `1080`).
+/// * `vrefresh` - The vertical refresh rate in Hz (e.g., `60`).
 ///
 /// # Returns
-/// A `Result` indicating success or an error if the mode cannot be set.
+/// A `Result` indicating success (`Ok(())`) or an error if the mode cannot be set.
 ///
 /// # Errors
-/// Returns an error if the connection fails, the mode is unavailable, or the command fails.
+/// Returns an error if:
+/// - The connection to the Wayland server fails.
+/// - The specified screen is not found.
+/// - The requested mode is unavailable for the target screen(s).
+/// - The IPC command fails to execute.
 ///
 /// # Examples
 /// ```
+/// // Set mode for a specific screen
 /// wayland_set_mode(Some("eDP-1"), 1920, 1080, 60)?;
+/// // Set mode for all screens
+/// wayland_set_mode(None, 1280, 720, 60)?;
 /// ```
 pub fn wayland_set_mode(
     screen: Option<&str>,
@@ -369,22 +395,50 @@ pub fn wayland_set_mode(
     height: i32,
     vrefresh: i32,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // Log the attempt to set the display mode
     info!(
         "Setting display mode to {}x{}@{}Hz for screen: {:?}",
         width, height, vrefresh, screen
     );
-    let mut connection = Connection::new()?;
-    let outputs: Vec<Output> = connection.get_outputs()?;
 
-    // Iterate over filtered outputs
-    for output in filter_outputs(outputs, screen) {
-        // Verify if the requested mode exists in available modes
+    // Establish connection to the Wayland server
+    let mut connection = Connection::new()?;
+    let outputs = connection.get_outputs()?;
+
+    // Pre-process outputs into a HashMap for efficient lookup
+    let outputs_map = preprocess_outputs(outputs);
+
+    // Determine target outputs based on the screen argument
+    let target_outputs: Vec<&Output> = match screen {
+        Some(screen_name) => {
+            // If a specific screen is provided, look it up directly in the map
+            if let Some(output) = outputs_map.get(screen_name) {
+                vec![output]
+            } else {
+                // Screen not found, log a warning and return an error
+                warn!("Screen '{}' not found in available outputs.", screen_name);
+                return Err(format!("Screen '{}' not found", screen_name).into());
+            }
+        }
+        None => {
+            // No screen specified, target all outputs
+            outputs_map.values().collect()
+        }
+    };
+
+    // Track if at least one output was successfully updated
+    let mut any_success = false;
+
+    // Process each target output
+    for output in target_outputs {
+        // Check if the requested mode exists among available modes
         let mode_exists = output
             .modes
             .iter()
             .any(|mode| mode.width == width && mode.height == height);
 
         if !mode_exists {
+            // Mode not available, log a warning and skip this output
             warn!(
                 "Mode {}x{}@{}Hz is not available for output '{}'",
                 width, height, vrefresh, output.name
@@ -392,27 +446,42 @@ pub fn wayland_set_mode(
             continue;
         }
 
-        // Construct and execute the IPC command to set the mode
+        // Construct the IPC command to set the mode
         let command = format!(
             "output {} mode {}x{}@{}Hz",
             output.name, width, height, vrefresh
         );
-        let replies = connection.run_command(&command)?;
 
+        // Execute the command and handle replies
+        let replies = connection.run_command(&command)?;
         for reply in replies {
             if let Err(error) = reply.as_ref() {
+                // Command failed, log the error and propagate it
                 error!("Failed to set mode for output '{}': {}", output.name, error);
                 return Err(
                     format!("Failed to set mode for output '{}': {}", output.name, error).into(),
                 );
             }
         }
+
+        // Mode set successfully, log the result
         info!(
             "Mode set to {}x{}@{}Hz for output '{}'",
             width, height, vrefresh, output.name
         );
+        any_success = true;
     }
 
+    // If a specific screen was targeted and no success occurred, return an error
+    if !any_success && screen.is_some() {
+        return Err(format!(
+            "Failed to set mode {}x{}@{}Hz for specified screen",
+            width, height, vrefresh
+        )
+        .into());
+    }
+
+    // All operations completed successfully
     Ok(())
 }
 
