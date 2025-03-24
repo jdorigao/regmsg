@@ -209,17 +209,24 @@ pub fn wayland_current_mode(screen: Option<&str>) -> Result<String, Box<dyn std:
     let outputs: Vec<Output> = connection.get_outputs()?;
 
     let mut current_mode_string = String::new();
+    let filtered_outputs: Vec<_> = filter_outputs(outputs, screen).collect();
+    let total_outputs = filtered_outputs.len();
 
     // Iterate over filtered outputs
-    for output in filter_outputs(outputs, screen) {
+    for (i, output) in filtered_outputs.into_iter().enumerate() {
         if let Some(current_mode) = output.current_mode {
             // Format the current mode with resolution and refresh rate
             current_mode_string.push_str(&format!(
-                "{}x{}@{}",
+                "{}:{}x{}@{}Hz",
+                output.name,
                 current_mode.width,
                 current_mode.height,
                 format_refresh(current_mode.refresh)
             ));
+            if i < total_outputs - 1 {
+                // Add a newline except after the last output
+                current_mode_string.push_str("\n");
+            }
         }
     }
 
