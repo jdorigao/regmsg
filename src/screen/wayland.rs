@@ -1,9 +1,9 @@
 use chrono::Local;
 use log::{debug, error, info, warn};
+use std::collections::HashMap;
 use std::fs;
 use std::process::Command;
 use swayipc::{Connection, Mode, Output};
-use std::collections::HashMap;
 
 /// Pre-processes a vector of outputs into a HashMap for efficient lookup by name.
 ///
@@ -19,7 +19,10 @@ use std::collections::HashMap;
 /// # Performance
 /// This runs in O(n) time to build the map, but enables constant-time lookups later.
 fn preprocess_outputs(outputs: Vec<Output>) -> HashMap<String, Output> {
-    outputs.into_iter().map(|output| (output.name.clone(), output)).collect()
+    outputs
+        .into_iter()
+        .map(|output| (output.name.clone(), output))
+        .collect()
 }
 
 /// Converts a refresh rate from mHz to Hz if applicable.
@@ -87,7 +90,7 @@ fn filter_outputs(outputs: Vec<Output>, screen: Option<&str>) -> impl Iterator<I
 
 /// Lists available display modes for a specific screen (or all screens if none specified).
 ///
-/// This function retrieves all available display modes from the Wayland server using swayipc,
+/// This function retrieves all available display modes from the Wayland server using `swayipc`,
 /// including predefined modes and the current mode, formatting them into a string.
 /// It uses lazy filtering via `filter_outputs` to process only the relevant outputs.
 /// The refresh rate is processed to ensure correct conversion from mHz to Hz.
@@ -97,56 +100,73 @@ fn filter_outputs(outputs: Vec<Output>, screen: Option<&str>) -> impl Iterator<I
 ///
 /// # Returns
 /// A `Result` containing a formatted string with the available modes or an error.
+/// Each mode is listed in the format "widthxheight@refresh_rate" (e.g., "1920x1080@60Hz").
 ///
 /// # Errors
 /// Returns an error if the connection to the Wayland server fails or if no outputs are retrieved.
 ///
 /// # Examples
-/// ```
+/// ```rust
 /// let modes = wayland_list_modes(Some("eDP-1"))?;
 /// println!("{}", modes); // Outputs available modes like "1920x1080@60Hz"
 /// ```
 pub fn wayland_list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
+    // Log the start of the operation with the screen filter, if any
     info!("Listing display modes for screen: {:?}", screen);
+
     // Establish a new connection to the Wayland server
     let mut connection = Connection::new()?;
+
+    // Retrieve all outputs from the server
     let outputs: Vec<Output> = connection.get_outputs()?;
 
+    // Initialize an empty string to store the formatted modes
     let mut modes_string = String::new();
 
-    // Iterate over filtered outputs
-    for output in filter_outputs(outputs, screen) {
-        // Add hardcoded maximum resolution options
-        modes_string.push_str(&format!("{}", "max-1920x1080:maximum 1920x1080"));
-        modes_string.push_str(&format!("\n{}", "max-640x480:maximum 640x480"));
+    // Add hardcoded maximum resolutions as fallback options
+    debug!("Adding hardcoded maximum resolutions");
+    modes_string.push_str(&format!("{}\n", "max-1920x1080:maximum 1920x1080"));
+    modes_string.push_str(&format!("{}\n", "max-640x480:maximum 640x480"));
 
-        // Append the current mode if it exists
-        if let Some(current_mode) = output.current_mode {
-            modes_string.push_str(&format!(
-                "\n{}x{}@{}:{}x{}@{}",
-                current_mode.width,
-                current_mode.height,
-                current_mode.refresh,
-                current_mode.width,
-                current_mode.height,
-                format_refresh(current_mode.refresh)
-            ));
-        }
+    // Get the total number of outputs
+    let filtered_outputs: Vec<_> = filter_outputs(outputs, screen).collect();
+    let total_outputs = filtered_outputs.len();
 
-        // Append all available modes for this output
-        for mode in output.modes {
+    // Iterate over the filtered outputs with index
+    for (output_idx, output) in filtered_outputs.into_iter().enumerate() {
+        // Get the total number of modes for this output
+        let total_modes = output.modes.len();
+
+        // Iterate over each mode in the output with an index
+        for (mode_idx, mode) in output.modes.iter().enumerate() {
+            // Format the mode as "widthxheight@refresh_rate" and append it to the string
             modes_string.push_str(&format!(
-                "\n{}x{}@{}:{}x{}@{}",
+                "{}x{}@{}:{} {}x{}@{}",
                 mode.width,
                 mode.height,
                 mode.refresh,
+                output.name,
                 mode.width,
                 mode.height,
-                format_refresh(mode.refresh)
+                format_refresh(mode.refresh), // Convert refresh rate from mHz to Hz
             ));
+
+            // Add a newline after each mode except the last one in this output
+            if mode_idx < total_modes - 1 {
+                modes_string.push_str("\n");
+            }
+        }
+
+        // Add a newline between outputs except after the last one
+        if output_idx < total_outputs - 1 {
+            modes_string.push_str("\n");
         }
     }
+
+    // Log successful completion of the operation
     info!("Display modes listed successfully.");
+
+    // Return the formatted string wrapped in a Result
     Ok(modes_string)
 }
 
@@ -175,6 +195,7 @@ pub fn wayland_list_outputs() -> Result<String, Box<dyn std::error::Error>> {
     // Iterate over outputs and build the string
     for (i, output) in outputs.iter().enumerate() {
         outputs_string.push_str(&format!("{}", output.name));
+
         if i < outputs.len() - 1 {
             // Add a newline except after the last output
             outputs_string.push_str("\n");
@@ -215,10 +236,11 @@ pub fn wayland_current_mode(screen: Option<&str>) -> Result<String, Box<dyn std:
         if let Some(current_mode) = output.current_mode {
             // Format the current mode with resolution and refresh rate
             current_mode_string.push_str(&format!(
-                "{}x{}@{}",
+                "{}x{}@{}:{}",
                 current_mode.width,
                 current_mode.height,
-                format_refresh(current_mode.refresh)
+                format_refresh(current_mode.refresh),
+                output.name
             ));
         }
     }
@@ -286,7 +308,7 @@ pub fn wayland_current_output() -> Result<String, Box<dyn std::error::Error>> {
 /// Returns an error if the connection to the Wayland server fails.
 ///
 /// # Examples
-/// ```
+/// ```rust
 /// let resolution = wayland_current_resolution(Some("eDP-1"))?;
 /// println!("{}", resolution); // Outputs something like "1920x1080"
 /// ```
@@ -298,12 +320,21 @@ pub fn wayland_current_resolution(
     let outputs: Vec<Output> = connection.get_outputs()?;
 
     let mut resolution_string = String::new();
+    let filtered_outputs: Vec<_> = filter_outputs(outputs, screen).collect(); // Collect to count outputs
+    let total_outputs = filtered_outputs.len();
 
     // Iterate over filtered outputs
-    for output in filter_outputs(outputs, screen) {
+    for (i, output) in filtered_outputs.into_iter().enumerate() {
         if let Some(current_mode) = output.current_mode {
-            // Format resolution as width x height
-            resolution_string.push_str(&format!("{}x{}", current_mode.width, current_mode.height));
+            // Format resolution as width x height x name
+            resolution_string.push_str(&format!(
+                "{}x{}",
+                current_mode.width, current_mode.height
+            ));
+            // Add a newline except after the last output
+            if i < total_outputs - 1 {
+                resolution_string.push_str("\n");
+            }
         }
     }
 
@@ -332,7 +363,7 @@ pub fn wayland_current_resolution(
 /// Returns an error if the connection to the Wayland server fails or if no outputs are retrieved.
 ///
 /// # Examples
-/// ```
+/// ```rust
 /// let refresh = wayland_current_refresh(Some("eDP-1"))?;
 /// println!("{}", refresh); // Outputs something like "60Hz"
 /// ```
@@ -342,12 +373,18 @@ pub fn wayland_current_refresh(screen: Option<&str>) -> Result<String, Box<dyn s
     let outputs: Vec<Output> = connection.get_outputs()?;
 
     let mut refresh_string = String::new();
+    let filtered_outputs: Vec<_> = filter_outputs(outputs, screen).collect(); // Collect to count outputs
+    let total_outputs = filtered_outputs.len();
 
     // Iterate over filtered outputs
-    for output in filter_outputs(outputs, screen) {
+    for (i, output) in filtered_outputs.into_iter().enumerate() {
         if let Some(current_mode) = output.current_mode {
-            // Format refresh rate using the helper function
+            // Format refresh rate using the helper function and append it
             refresh_string.push_str(&format_refresh(current_mode.refresh));
+            // Add a newline except after the last output
+            if i < total_outputs - 1 {
+                refresh_string.push_str("\n");
+            }
         }
     }
 
