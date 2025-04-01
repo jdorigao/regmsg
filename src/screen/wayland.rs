@@ -44,10 +44,10 @@ fn preprocess_outputs(outputs: Vec<Output>) -> HashMap<String, Output> {
 fn format_refresh(refresh: i32) -> String {
     if refresh >= 1000 {
         // Value is in mHz, convert to Hz by dividing by 1000
-        format!("{}Hz", refresh / 1000)
+        format!("{}", refresh / 1000)
     } else {
         // Value is already in Hz, append "Hz" unit
-        format!("{}Hz", refresh)
+        format!("{}", refresh)
     }
 }
 
@@ -141,10 +141,10 @@ pub fn wayland_list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::e
         for (mode_idx, mode) in output.modes.iter().enumerate() {
             // Format the mode as "widthxheight@refresh_rate" and append it to the string
             modes_string.push_str(&format!(
-                "{}x{}@{}:{} {}x{}@{}",
+                "{}x{}@{}:{} {}x{}@{}Hz",
                 mode.width,
                 mode.height,
-                mode.refresh,
+                format_refresh(mode.refresh), // Convert refresh rate from mHz to Hz
                 output.name,
                 mode.width,
                 mode.height,
@@ -236,11 +236,10 @@ pub fn wayland_current_mode(screen: Option<&str>) -> Result<String, Box<dyn std:
         if let Some(current_mode) = output.current_mode {
             // Format the current mode with resolution and refresh rate
             current_mode_string.push_str(&format!(
-                "{}x{}@{}:{}",
+                "{}x{}@{}",
                 current_mode.width,
                 current_mode.height,
-                format_refresh(current_mode.refresh),
-                output.name
+                format_refresh(current_mode.refresh) // Convert refresh rate from mHz to Hz
             ));
         }
     }
@@ -871,8 +870,8 @@ pub fn wayland_min_to_max_resolution(
             if let Some(mode) = best_mode {
                 // Set the best available mode
                 let command = format!(
-                    "output {} mode {}x{}@{}Hz",
-                    output.name, mode.width, mode.height, mode.refresh
+                    "output {} mode {}x{}@{}",
+                    output.name, mode.width, mode.height, format_refresh(mode.refresh)
                 );
                 for reply in connection.run_command(&command)? {
                     if let Err(error) = reply {
