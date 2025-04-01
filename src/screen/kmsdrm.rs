@@ -166,9 +166,12 @@ pub fn drm_list_modes(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
 
         for mode in modes {
             let mode_str = format!(
-                "\n{}x{}:{}x{}@{}Hz",
+                "\n{}x{}@{}Hz:{:?}-{:?} {}x{}@{}Hz",
                 mode.size().0,
                 mode.size().1,
+                mode.vrefresh(),
+                connector_info.interface(),
+                connector_info.interface_id(),
                 mode.size().0,
                 mode.size().1,
                 mode.vrefresh()
@@ -259,10 +262,12 @@ pub fn drm_current_mode(screen: Option<&str>) -> Result<String, Box<dyn Error>> 
                         let crtc_info = card.get_crtc(crtc_id)?;
                         if let Some(mode) = crtc_info.mode() {
                             let mode_str = format!(
-                                "{}x{}@{}Hz",
+                                "{}x{}@{}Hz:{:?}-{:?}",
                                 mode.size().0,
                                 mode.size().1,
-                                mode.vrefresh()
+                                mode.vrefresh(),
+                                connector_info.interface(),
+                                connector_info.interface_id()
                             );
                             debug!("Current mode found: {}", mode_str);
                             current_mode_string.push_str(&mode_str);
