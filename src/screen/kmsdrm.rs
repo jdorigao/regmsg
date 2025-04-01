@@ -33,9 +33,9 @@ impl Device for Card {}
 impl ControlDevice for Card {}
 
 impl Card {
-    /// Opens the first available DRM device found in `/dev/dri/`.
+    /// Opens the first available DRM device in `/dev/dri/`.
     ///
-    /// Iterates through directory entries in `/dev/dri/` and attempts to open a file starting with "card".
+    /// Iterates through the directory entries in `/dev/dri/` and attempts to open a file starting with "card".
     ///
     /// # Returns
     /// - `Ok(Card)` if a device is successfully opened.
@@ -44,28 +44,60 @@ impl Card {
         let dri_path = Path::new("/dev/dri/");
         info!("Searching for DRM devices in {:?}", dri_path);
 
-        debug!("Reading directory entries in {:?}", dri_path);
+        debug!("Reading directory entries from {:?}", dri_path);
+        let mut last_error = None;
+
         for entry in dri_path.read_dir()? {
-            let entry = entry?;
+            let entry = match entry {
+                Ok(e) => e,
+                Err(e) => {
+                    warn!("Error reading entry in /dev/dri/: {}", e);
+                    continue;
+                }
+            };
             let path = entry.path();
             if let Some(file_name) = path.file_name() {
                 if file_name.to_string_lossy().starts_with("card") {
-                    debug!("Trying to open device: {:?}", path);
+                    debug!("Attempting to open device: {:?}", path);
                     let mut options = OpenOptions::new();
                     options.read(true).write(true); // Open with read/write permissions
                     match options.open(&path) {
                         Ok(file) => {
-                            info!("Successfully opened DRM device: {:?}", path);
+                            info!("DRM device opened successfully: {:?}", path);
                             debug!("File descriptor obtained for {:?}", path);
-                            return Ok(Card(file));
+                            // Verify if the device supports basic operations
+                            let card = Card(file);
+                            match card.resource_handles() {
+                                Ok(resources) => {
+                                    info!("Resources available on {:?}: {} connectors", path, resources.connectors().len());
+                                    return Ok(card);
+                                }
+                                Err(e) if e.raw_os_error() == Some(95) => {
+                                    warn!("Device {:?} does not support required DRM operations: {}", path, e);
+                                    last_error = Some(e);
+                                    continue; // Try the next device
+                                }
+                                Err(e) => {
+                                    warn!("Error checking resources on {:?}: {}", path, e);
+                                    last_error = Some(e);
+                                    continue;
+                                }
+                            }
                         }
-                        Err(e) => warn!("Failed to open {:?}: {}", path, e),
+                        Err(e) => {
+                            warn!("Failed to open {:?}: {}", path, e);
+                            last_error = Some(e);
+                        }
                     }
                 }
             }
         }
-        error!("No DRM device found in /dev/dri/");
-        Err("No DRM device found in /dev/dri/".into())
+
+        error!("No functional DRM device found in /dev/dri/");
+        match last_error {
+            Some(e) => Err(Box::new(e)),
+            None => Err("No DRM device found in /dev/dri/".into()),
+        }
     }
 }
 
@@ -143,6 +175,12 @@ where
 /// # Returns
 /// - `Ok(String)` containing all available modes in a formatted string.
 /// - `Err(Box<dyn Error>)` if an error occurs while accessing the DRM device.
+///
+/// # Examples
+/// ```
+/// let modes = drm_list_modes(Some("HDMI")).unwrap();
+/// println!("{}", modes);
+/// ```
 pub fn drm_list_modes(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
     info!("Listing display modes for screen: {:?}", screen);
     debug!("Opening first available DRM card");
@@ -196,6 +234,12 @@ pub fn drm_list_modes(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
 /// # Returns
 /// - `Ok(String)` listing all connector names (e.g., "HDMI-A-1", "DP-1").
 /// - `Err(Box<dyn Error>)` if an error occurs while accessing the DRM device.
+///
+/// # Examples
+/// ```
+/// let outputs = drm_list_outputs().unwrap();
+/// println!("{}", outputs);
+/// ```
 pub fn drm_list_outputs() -> Result<String, Box<dyn Error>> {
     info!("Listing available outputs");
     debug!("Opening first available DRM card");
@@ -237,6 +281,12 @@ pub fn drm_list_outputs() -> Result<String, Box<dyn Error>> {
 /// # Returns
 /// - `Ok(String)` in the format "WIDTHxHEIGHT@REFRESH_RATE" (e.g., "1920x1080@60Hz").
 /// - `Err(Box<dyn Error>)` if an error occurs or no mode is found.
+///
+/// # Examples
+/// ```
+/// let mode = drm_current_mode(Some("HDMI")).unwrap();
+/// println!("Current mode: {}", mode);
+/// ```
 pub fn drm_current_mode(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
     info!("Getting current mode for screen: {:?}", screen);
     debug!("Opening first available DRM card");
@@ -295,6 +345,12 @@ pub fn drm_current_mode(screen: Option<&str>) -> Result<String, Box<dyn Error>> 
 /// # Returns
 /// - `Ok(String)` with the name of the connected output (e.g., "HDMI-A-1").
 /// - `Err(Box<dyn Error>)` if an error occurs or no connected output is found.
+///
+/// # Examples
+/// ```
+/// let output = drm_current_output().unwrap();
+/// println!("Current output: {}", output);
+/// ```
 pub fn drm_current_output() -> Result<String, Box<dyn Error>> {
     info!("Getting current output");
     debug!("Opening first available DRM card");
@@ -336,6 +392,12 @@ pub fn drm_current_output() -> Result<String, Box<dyn Error>> {
 /// # Returns
 /// - `Ok(String)` in the format "WIDTHxHEIGHT" (e.g., "1920x1080").
 /// - `Err(Box<dyn Error>)` if an error occurs or no resolution is found.
+///
+/// # Examples
+/// ```
+/// let resolution = drm_current_resolution(Some("HDMI")).unwrap();
+/// println!("Current resolution: {}", resolution);
+/// ```
 pub fn drm_current_resolution(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
     info!("Getting current resolution for screen: {:?}", screen);
     debug!("Opening first available DRM card");
@@ -391,6 +453,12 @@ pub fn drm_current_resolution(screen: Option<&str>) -> Result<String, Box<dyn Er
 /// # Returns
 /// - `Ok(String)` in the format "REFRESH_RATEHz" (e.g., "60Hz").
 /// - `Err(Box<dyn Error>)` if an error occurs or no refresh rate is found.
+///
+/// # Examples
+/// ```
+/// let refresh = drm_current_refresh(Some("HDMI")).unwrap();
+/// println!("Current refresh rate: {}", refresh);
+/// ```
 pub fn drm_current_refresh(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
     info!("Getting current refresh rate for screen: {:?}", screen);
     debug!("Opening first available DRM card");
@@ -448,6 +516,11 @@ pub fn drm_current_refresh(screen: Option<&str>) -> Result<String, Box<dyn Error
 /// # Returns
 /// - `Ok(())` if the mode is set successfully.
 /// - `Err(Box<dyn Error>)` if no matching mode is found or an error occurs.
+///
+/// # Examples
+/// ```
+/// drm_set_mode(Some("HDMI"), 1920, 1080, 60).unwrap();
+/// ```
 pub fn drm_set_mode(
     screen: Option<&str>,
     width: i32,
@@ -537,6 +610,11 @@ pub fn drm_set_mode(
 /// # Returns
 /// - `Ok(())` if the output is set successfully.
 /// - `Err(Box<dyn Error>)` if the specified output is not found or an error occurs.
+///
+/// # Examples
+/// ```
+/// drm_set_output("HDMI-A-1").unwrap();
+/// ```
 pub fn drm_set_output(output: &str) -> Result<(), Box<dyn Error>> {
     info!("Setting output to {}", output);
     debug!("Opening first available DRM card");
@@ -596,8 +674,13 @@ pub fn drm_set_output(output: &str) -> Result<(), Box<dyn Error>> {
 /// - `rotation`: The rotation value as a string ("0", "90", "180", "270").
 ///
 /// # Returns
-/// - `Ok(())` if the rotation is set successfully.
+/// - `Ok(())` if the rotation is setNor successfully.
 /// - `Err(Box<dyn Error>)` if the rotation value is invalid or no matching screen is found.
+///
+/// # Examples
+/// ```
+/// drm_set_rotation(Some("HDMI"), "90").unwrap();
+/// ```
 pub fn drm_set_rotation(screen: Option<&str>, rotation: &str) -> Result<(), Box<dyn Error>> {
     info!(
         "Starting rotation setting process for rotation '{}' on screen {:?}",
@@ -729,6 +812,11 @@ pub fn drm_get_screenshot() -> Result<(), Box<dyn Error>> {
 /// # Returns
 /// - `Ok(())` if the maximum resolution is set successfully.
 /// - `Err(Box<dyn Error>)` if no suitable resolution is found or an error occurs.
+///
+/// # Examples
+/// ```
+/// drm_to_max_resolution(Some("HDMI"), None).unwrap();
+/// ```
 pub fn drm_to_max_resolution(
     screen: Option<&str>,
     _max_resolution: Option<String>,
