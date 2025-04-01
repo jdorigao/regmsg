@@ -22,6 +22,7 @@ fn main() {
         .subcommand(Command::new("currentOutput").about("Displays the current output (e.g., HDMI, VGA)."))
         .subcommand(Command::new("currentResolution").about("Displays the current resolution for the specified screen."))
         .subcommand(Command::new("currentRefresh").about("Displays the current refresh rate for the specified screen."))
+        .subcommand(Command::new("currentBackend").about("Current window system.."))
         .subcommand(
             Command::new("setMode")
                 .about("Sets the display mode for the specified screen.")
@@ -57,6 +58,7 @@ fn main() {
         Some(("currentOutput", _)) => screen::current_output(),
         Some(("currentResolution", _)) => screen::current_resolution(screen),
         Some(("currentRefresh", _)) => screen::current_refresh(screen),
+        Some(("currentBackend", _)) => screen::current_backend(),
         Some(("setMode", sub_matches)) => {
             let mode = sub_matches.get_one::<String>("MODE").unwrap();
             screen::set_mode(screen, mode).map(|_| "Mode set successfully".to_string())

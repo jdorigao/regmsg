@@ -1,12 +1,14 @@
 use log::{debug, error, info, warn};
 use std::env;
 
+// Modules for backend-specific implementations
 mod kmsdrm;
 mod wayland;
 
 /// Represents display mode information including width, height, and refresh rate.
 ///
-/// This struct is used to store parsed display mode details for further processing.
+/// This struct is used to store parsed display mode details for further processing, such as
+/// setting or querying display configurations.
 #[derive(Debug)]
 struct ModeInfo {
     width: i32,    // Screen width in pixels
@@ -60,6 +62,7 @@ fn parse_mode(mode: &str) -> Result<ModeInfo, Box<dyn std::error::Error>> {
     // Parse width and height from the split parts
     let width = parts[0].parse::<i32>().map_err(|_| "Invalid width")?;
     let height = parts[1].parse::<i32>().map_err(|_| "Invalid height")?;
+    // Parse refresh rate if provided, otherwise default to 60 Hz
     let vrefresh = if parts.len() == 3 {
         parts[2]
             .parse::<i32>()
@@ -79,7 +82,8 @@ fn parse_mode(mode: &str) -> Result<ModeInfo, Box<dyn std::error::Error>> {
 /// Lists available display modes for the specified screen.
 ///
 /// This function queries the graphics backend (Wayland or KMS/DRM) to retrieve a list
-/// of supported display modes for the given screen.
+/// of supported display modes for the given screen. The result is printed to the console
+/// and returned as a string.
 ///
 /// # Arguments
 /// * `screen` - An optional string specifying the screen to query (e.g., "HDMI-1").
@@ -89,20 +93,21 @@ fn parse_mode(mode: &str) -> Result<ModeInfo, Box<dyn std::error::Error>> {
 pub fn list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
     info!("Listing display modes for screen: {:?}", screen);
     let result = match detect_backend() {
-        "Wayland" => wayland::wayland_list_modes(screen), // Call Wayland-specific function
-        "KMS/DRM" => kmsdrm::drm_list_modes(screen),      // Call KMS/DRM-specific function
+        "Wayland" => wayland::wayland_list_modes(screen), // Delegate to Wayland-specific implementation
+        "KMS/DRM" => kmsdrm::drm_list_modes(screen),      // Delegate to KMS/DRM-specific implementation
         _ => {
             warn!("Unknown backend detected.");
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
         }
     }?;
-    println!("{}", result); // Output the result to the console
+    println!("{}", result); // Output the result to the console for user visibility
     Ok(result)
 }
 
 /// Lists available outputs (e.g., HDMI, VGA).
 ///
 /// This function retrieves a list of connected display outputs based on the detected graphics backend.
+/// The result is printed to the console and returned as a string.
 ///
 /// # Returns
 /// A `Result` containing a string with the list of outputs, or an error message if the query fails.
@@ -123,6 +128,7 @@ pub fn list_outputs() -> Result<String, Box<dyn std::error::Error>> {
 /// Displays the current display mode for the specified screen.
 ///
 /// This function retrieves the active display mode (resolution and refresh rate) for the given screen.
+/// The result is printed to the console and returned as a string.
 ///
 /// # Arguments
 /// * `screen` - An optional string specifying the screen to query.
@@ -146,6 +152,7 @@ pub fn current_mode(screen: Option<&str>) -> Result<String, Box<dyn std::error::
 /// Displays the current output (e.g., HDMI, VGA).
 ///
 /// This function identifies the currently active output based on the graphics backend.
+/// The result is printed to the console and returned as a string.
 ///
 /// # Returns
 /// A `Result` containing a string with the current output, or an error message if the query fails.
@@ -166,6 +173,7 @@ pub fn current_output() -> Result<String, Box<dyn std::error::Error>> {
 /// Displays the current resolution for the specified screen.
 ///
 /// This function retrieves the current resolution (width x height) for the given screen.
+/// The result is printed to the console and returned as a string.
 ///
 /// # Arguments
 /// * `screen` - An optional string specifying the screen to query.
@@ -189,6 +197,7 @@ pub fn current_resolution(screen: Option<&str>) -> Result<String, Box<dyn std::e
 /// Displays the current refresh rate for the specified screen.
 ///
 /// This function retrieves the current refresh rate (in Hz) for the given screen.
+/// The result is printed to the console and returned as a string.
 ///
 /// # Arguments
 /// * `screen` - An optional string specifying the screen to query.
@@ -212,7 +221,7 @@ pub fn current_refresh(screen: Option<&str>) -> Result<String, Box<dyn std::erro
 /// Sets the display mode for the specified screen.
 ///
 /// This function allows setting a specific display mode (resolution and refresh rate) or a maximum resolution
-/// indicated by the "max-" prefix.
+/// indicated by the "max-" prefix. It parses the mode string and delegates to the appropriate backend.
 ///
 /// # Arguments
 /// * `screen` - An optional string specifying the screen to configure.
@@ -255,7 +264,7 @@ pub fn set_mode(screen: Option<&str>, mode: &str) -> Result<(), Box<dyn std::err
 
 /// Sets the output resolution and refresh rate (e.g., "1920x1080@60").
 ///
-/// This function configures the output settings for the active display.
+/// This function configures the output settings for the active display using the specified mode string.
 ///
 /// # Arguments
 /// * `output` - A string representing the output resolution and refresh rate to set.
@@ -278,6 +287,7 @@ pub fn set_output(output: &str) -> Result<(), Box<dyn std::error::Error>> {
 /// Sets the screen rotation for the specified screen.
 ///
 /// This function rotates the display to the specified angle (0, 90, 180, or 270 degrees).
+/// The rotation is applied based on the detected graphics backend.
 ///
 /// # Arguments
 /// * `screen` - An optional string specifying the screen to configure.
@@ -303,7 +313,8 @@ pub fn set_rotation(
 
 /// Takes a screenshot of the current screen.
 ///
-/// This function captures the current screen content and saves it (implementation depends on the backend).
+/// This function captures the current screen content and saves it. The implementation
+/// depends on the detected backend (Wayland or KMS/DRM).
 ///
 /// # Returns
 /// A `Result` indicating success or an error message if the operation fails.
@@ -322,7 +333,8 @@ pub fn get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Maps the touchscreen to the correct display.
 ///
-/// This function configures the touchscreen input to align with the current display (Wayland only).
+/// This function configures the touchscreen input to align with the current display.
+/// Currently, this is supported only on Wayland.
 ///
 /// # Returns
 /// A `Result` indicating success or an error message if the operation fails.
@@ -344,7 +356,8 @@ pub fn map_touch_screen() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Sets the screen resolution to the maximum supported resolution (e.g., 1920x1080).
 ///
-/// This function sets the display to a predefined maximum resolution, defaulting to 1920x1080.
+/// This function sets the display to a predefined maximum resolution, defaulting to 1920x1080
+/// if no specific resolution is provided elsewhere.
 ///
 /// # Arguments
 /// * `screen` - An optional string specifying the screen to configure.
@@ -365,4 +378,20 @@ pub fn min_to_max_resolution(screen: Option<&str>) -> Result<(), Box<dyn std::er
         }
     }
     Ok(())
+}
+
+/// Retrieves the currently detected graphics backend.
+///
+/// This function calls `detect_backend()` and returns the result as a string.
+/// The backend name is also printed to the console.
+///
+/// # Returns
+/// A `Result` containing the detected backend as a string ("Wayland" or "KMS/DRM"),
+/// or an error message if the operation fails.
+pub fn current_backend() -> Result<String, Box<dyn std::error::Error>> {
+    info!("Fetching current graphics backend."); // Log indicando que a função foi chamada
+    let backend = detect_backend();
+    info!("Detected backend: {}", backend); // Log com o backend detectado
+    println!("{}", backend);
+    Ok(backend.to_string())
 }
