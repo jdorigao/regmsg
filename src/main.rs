@@ -6,7 +6,7 @@ fn main() {
     env_logger::init();
 
     let matches = Command::new("regmsg")
-        .version("0.0.0")
+        .version("0.0.1")
         .author("Juliano Dorigão")
         .about("A tool to manage screen resolution and display settings.")
         .arg(
