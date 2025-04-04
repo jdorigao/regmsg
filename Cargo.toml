@@ -1,6 +1,6 @@
 [package]
 name = "regmsg"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2024"
 authors = ["Juliano Dorigão <jdorigao@gmail.com>"]
 description = "Manages screen resolution and display settings"

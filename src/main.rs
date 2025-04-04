@@ -7,7 +7,7 @@ mod screen; // Importing the screen module
 fn main() {
     // Configure and parse command-line arguments
     let matches = Command::new("regmsg")
-        .version("0.0.1") // Application version
+        .version("0.0.2") // Application version
         .author("Juliano Dorigão") // Author information
         .about("A tool to manage screen resolution and display settings.") // Short description
         .arg(
