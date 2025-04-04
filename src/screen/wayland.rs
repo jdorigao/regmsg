@@ -111,9 +111,6 @@ fn filter_outputs(outputs: Vec<Output>, screen: Option<&str>) -> impl Iterator<I
 /// println!("{}", modes); // Outputs available modes like "1920x1080@60Hz"
 /// ```
 pub fn wayland_list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
-    // Log the start of the operation with the screen filter, if any
-    info!("Listing display modes for screen: {:?}", screen);
-
     // Establish a new connection to the Wayland server
     let mut connection = Connection::new()?;
 
@@ -122,11 +119,6 @@ pub fn wayland_list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::e
 
     // Initialize an empty string to store the formatted modes
     let mut modes_string = String::new();
-
-    // Add hardcoded maximum resolutions as fallback options
-    debug!("Adding hardcoded maximum resolutions");
-    modes_string.push_str(&format!("{}\n", "max-1920x1080:maximum 1920x1080"));
-    modes_string.push_str(&format!("{}\n", "max-640x480:maximum 640x480"));
 
     // Get the total number of outputs
     let filtered_outputs: Vec<_> = filter_outputs(outputs, screen).collect();
@@ -186,7 +178,6 @@ pub fn wayland_list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::e
 /// println!("{}", outputs); // Outputs something like "eDP-1\nHDMI-1"
 /// ```
 pub fn wayland_list_outputs() -> Result<String, Box<dyn std::error::Error>> {
-    info!("Listing all available outputs.");
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -225,7 +216,6 @@ pub fn wayland_list_outputs() -> Result<String, Box<dyn std::error::Error>> {
 /// println!("{}", mode); // Outputs something like "1920x1080@60Hz"
 /// ```
 pub fn wayland_current_mode(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
-    info!("Getting current display mode for screen: {:?}", screen);
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -270,7 +260,6 @@ pub fn wayland_current_mode(screen: Option<&str>) -> Result<String, Box<dyn std:
 /// println!("{}", output); // Outputs something like "eDP-1"
 /// ```
 pub fn wayland_current_output() -> Result<String, Box<dyn std::error::Error>> {
-    info!("Getting current active output.");
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -314,7 +303,6 @@ pub fn wayland_current_output() -> Result<String, Box<dyn std::error::Error>> {
 pub fn wayland_current_resolution(
     screen: Option<&str>,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    info!("Getting current resolution for screen: {:?}", screen);
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -367,7 +355,6 @@ pub fn wayland_current_resolution(
 /// println!("{}", refresh); // Outputs something like "60Hz"
 /// ```
 pub fn wayland_current_refresh(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
-    info!("Getting current refresh rate for screen: {:?}", screen);
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -431,12 +418,6 @@ pub fn wayland_set_mode(
     height: i32,
     vrefresh: i32,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Log the attempt to set the display mode
-    info!(
-        "Setting display mode to {}x{}@{}Hz for screen: {:?}",
-        width, height, vrefresh, screen
-    );
-
     // Establish connection to the Wayland server
     let mut connection = Connection::new()?;
     let outputs = connection.get_outputs()?;
@@ -539,7 +520,6 @@ pub fn wayland_set_mode(
 /// wayland_set_output("eDP-1")?;
 /// ```
 pub fn wayland_set_output(output: &str) -> Result<(), Box<dyn std::error::Error>> {
-    info!("Enabling output: {}", output);
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -587,10 +567,6 @@ pub fn wayland_set_rotation(
     screen: Option<&str>,
     rotation: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    info!(
-        "Setting rotation to '{}' for screen: {:?}",
-        rotation, screen
-    );
     let mut connection = Connection::new()?;
     let outputs: Vec<Output> = connection.get_outputs()?;
 
@@ -714,7 +690,6 @@ pub fn wayland_get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
 /// wayland_map_touch_screen()?;
 /// ```
 pub fn wayland_map_touch_screen() -> Result<(), Box<dyn std::error::Error>> {
-    info!("Mapping touchscreen to output.");
     let mut connection = Connection::new()?;
 
     // Get list of input devices
@@ -799,11 +774,6 @@ pub fn wayland_min_to_max_resolution(
     screen: Option<&str>,
     max_resolution: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    info!(
-        "Setting resolution to maximum within limit for screen: {:?}",
-        screen
-    );
-
     // Parse max resolution or use default (1920x1080)
     let (max_width, max_height) = match max_resolution {
         Some(res) => {

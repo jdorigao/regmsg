@@ -1,4 +1,4 @@
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 use std::env;
 
 // Modules for backend-specific implementations
@@ -91,12 +91,11 @@ fn parse_mode(mode: &str) -> Result<ModeInfo, Box<dyn std::error::Error>> {
 /// # Returns
 /// A `Result` containing a string with the list of modes, or an error message if the query fails.
 pub fn list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
-    info!("Listing display modes for screen: {:?}", screen);
     let result = match detect_backend() {
         "Wayland" => wayland::wayland_list_modes(screen), // Delegate to Wayland-specific implementation
         "KMS/DRM" => kmsdrm::drm_list_modes(screen),      // Delegate to KMS/DRM-specific implementation
         _ => {
-            warn!("Unknown backend detected.");
+            debug!("Unknown backend detected.");
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
         }
     }?;
@@ -112,12 +111,11 @@ pub fn list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::error::Er
 /// # Returns
 /// A `Result` containing a string with the list of outputs, or an error message if the query fails.
 pub fn list_outputs() -> Result<String, Box<dyn std::error::Error>> {
-    info!("Listing available outputs.");
     let result = match detect_backend() {
         "Wayland" => wayland::wayland_list_outputs(),
         "KMS/DRM" => kmsdrm::drm_list_outputs(),
         _ => {
-            warn!("Unknown backend detected.");
+            debug!("Unknown backend detected.");
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
         }
     }?;
@@ -136,12 +134,11 @@ pub fn list_outputs() -> Result<String, Box<dyn std::error::Error>> {
 /// # Returns
 /// A `Result` containing a string with the current mode, or an error message if the query fails.
 pub fn current_mode(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
-    info!("Fetching current display mode for screen: {:?}", screen);
     let result = match detect_backend() {
         "Wayland" => wayland::wayland_current_mode(screen),
         "KMS/DRM" => kmsdrm::drm_current_mode(screen),
         _ => {
-            warn!("Unknown backend detected.");
+            debug!("Unknown backend detected.");
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
         }
     }?;
@@ -157,12 +154,11 @@ pub fn current_mode(screen: Option<&str>) -> Result<String, Box<dyn std::error::
 /// # Returns
 /// A `Result` containing a string with the current output, or an error message if the query fails.
 pub fn current_output() -> Result<String, Box<dyn std::error::Error>> {
-    info!("Fetching current output.");
     let result = match detect_backend() {
         "Wayland" => wayland::wayland_current_output(),
         "KMS/DRM" => kmsdrm::drm_current_output(),
         _ => {
-            warn!("Unknown backend detected.");
+            debug!("Unknown backend detected.");
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
         }
     }?;
@@ -181,12 +177,11 @@ pub fn current_output() -> Result<String, Box<dyn std::error::Error>> {
 /// # Returns
 /// A `Result` containing a string with the current resolution, or an error message if the query fails.
 pub fn current_resolution(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
-    info!("Fetching current resolution for screen: {:?}", screen);
     let result = match detect_backend() {
         "Wayland" => wayland::wayland_current_resolution(screen),
         "KMS/DRM" => kmsdrm::drm_current_resolution(screen),
         _ => {
-            warn!("Unknown backend detected.");
+            debug!("Unknown backend detected.");
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
         }
     }?;
@@ -205,12 +200,11 @@ pub fn current_resolution(screen: Option<&str>) -> Result<String, Box<dyn std::e
 /// # Returns
 /// A `Result` containing a string with the current refresh rate, or an error message if the query fails.
 pub fn current_refresh(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
-    info!("Fetching current refresh rate for screen: {:?}", screen);
     let result = match detect_backend() {
         "Wayland" => wayland::wayland_current_refresh(screen),
         "KMS/DRM" => kmsdrm::drm_current_refresh(screen),
         _ => {
-            warn!("Unknown backend detected.");
+            debug!("Unknown backend detected.");
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
         }
     }?;
@@ -230,14 +224,13 @@ pub fn current_refresh(screen: Option<&str>) -> Result<String, Box<dyn std::erro
 /// # Returns
 /// A `Result` indicating success or an error message if the operation fails.
 pub fn set_mode(screen: Option<&str>, mode: &str) -> Result<(), Box<dyn std::error::Error>> {
-    info!("Setting display mode for screen: {:?} to {}", screen, mode);
     if mode.starts_with("max-") {
         let max_resolution = mode.trim_start_matches("max-").to_string();
         match detect_backend() {
             "Wayland" => wayland::wayland_min_to_max_resolution(screen, Some(max_resolution))?,
             "KMS/DRM" => kmsdrm::drm_to_max_resolution(screen, Some(max_resolution))?,
             _ => {
-                warn!("Unknown backend detected.");
+                debug!("Unknown backend detected.");
                 println!("Unknown backend. Unable to determine display settings.");
             }
         }
@@ -254,7 +247,7 @@ pub fn set_mode(screen: Option<&str>, mode: &str) -> Result<(), Box<dyn std::err
                 kmsdrm::drm_set_mode(screen, mode_set.width, mode_set.height, mode_set.vrefresh)?
             }
             _ => {
-                warn!("Unknown backend detected.");
+                debug!("Unknown backend detected.");
                 println!("Unknown backend. Unable to determine display settings.");
             }
         }
@@ -272,12 +265,11 @@ pub fn set_mode(screen: Option<&str>, mode: &str) -> Result<(), Box<dyn std::err
 /// # Returns
 /// A `Result` indicating success or an error message if the operation fails.
 pub fn set_output(output: &str) -> Result<(), Box<dyn std::error::Error>> {
-    info!("Setting output to: {}", output);
     match detect_backend() {
         "Wayland" => wayland::wayland_set_output(output)?,
         "KMS/DRM" => kmsdrm::drm_set_output(output)?,
         _ => {
-            warn!("Unknown backend detected.");
+            debug!("Unknown backend detected.");
             println!("Unknown backend. Unable to determine display settings.");
         }
     }
@@ -299,12 +291,11 @@ pub fn set_rotation(
     screen: Option<&str>,
     rotation: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    info!("Setting rotation for screen: {:?} to {}", screen, rotation);
     match detect_backend() {
         "Wayland" => wayland::wayland_set_rotation(screen, rotation)?,
         "KMS/DRM" => kmsdrm::drm_set_rotation(screen, rotation)?,
         _ => {
-            warn!("Unknown backend detected.");
+            debug!("Unknown backend detected.");
             println!("Unknown backend. Unable to determine display settings.");
         }
     }
@@ -319,12 +310,11 @@ pub fn set_rotation(
 /// # Returns
 /// A `Result` indicating success or an error message if the operation fails.
 pub fn get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
-    info!("Taking screenshot.");
     match detect_backend() {
         "Wayland" => wayland::wayland_get_screenshot()?,
         "KMS/DRM" => kmsdrm::drm_get_screenshot()?,
         _ => {
-            warn!("Unknown backend detected.");
+            debug!("Unknown backend detected.");
             println!("Unknown backend. Unable to determine display settings.");
         }
     }
@@ -339,15 +329,14 @@ pub fn get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
 /// # Returns
 /// A `Result` indicating success or an error message if the operation fails.
 pub fn map_touch_screen() -> Result<(), Box<dyn std::error::Error>> {
-    info!("Mapping touchscreen.");
     match detect_backend() {
         "Wayland" => wayland::wayland_map_touch_screen()?,
         "KMS/DRM" => {
-            warn!("No touchscreen support for KMS/DRM.");
+            debug!("No touchscreen support for KMS/DRM.");
             println!("No touchscreen support.");
         }
         _ => {
-            warn!("Unknown backend detected.");
+            debug!("Unknown backend detected.");
             println!("Unknown backend. Unable to determine display settings.");
         }
     }
@@ -365,7 +354,6 @@ pub fn map_touch_screen() -> Result<(), Box<dyn std::error::Error>> {
 /// # Returns
 /// A `Result` indicating success or an error message if the operation fails.
 pub fn min_to_max_resolution(screen: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
-    info!("Setting resolution to maximum for screen: {:?}", screen);
     // Default maximum resolution if not overridden elsewhere
     let max_resolution = "1920x1080".to_string();
 
@@ -373,7 +361,7 @@ pub fn min_to_max_resolution(screen: Option<&str>) -> Result<(), Box<dyn std::er
         "Wayland" => wayland::wayland_min_to_max_resolution(screen, Some(max_resolution))?,
         "KMS/DRM" => kmsdrm::drm_to_max_resolution(screen, Some(max_resolution))?,
         _ => {
-            warn!("Unknown backend detected.");
+            debug!("Unknown backend detected.");
             println!("Unknown backend. Unable to determine display settings.");
         }
     }
@@ -389,9 +377,7 @@ pub fn min_to_max_resolution(screen: Option<&str>) -> Result<(), Box<dyn std::er
 /// A `Result` containing the detected backend as a string ("Wayland" or "KMS/DRM"),
 /// or an error message if the operation fails.
 pub fn current_backend() -> Result<String, Box<dyn std::error::Error>> {
-    info!("Fetching current graphics backend."); // Log indicando que a função foi chamada
     let backend = detect_backend();
-    info!("Detected backend: {}", backend); // Log com o backend detectado
     println!("{}", backend);
     Ok(backend.to_string())
 }

@@ -33,59 +33,55 @@ impl Device for Card {}
 impl ControlDevice for Card {}
 
 impl Card {
-    /// Opens the first available DRM device in `/dev/dri/`.
+    /// Opens the available DRM device in `/dev/dri/`.
     ///
-    /// Iterates through the directory entries in `/dev/dri/` and attempts to open a file starting with "card".
+    /// Iterates through the directory entries and attempts to open a device starting with "card".
+    /// If multiple devices are found, the one with the most available connectors is chosen.
     ///
     /// # Returns
     /// - `Ok(Card)` if a device is successfully opened.
-    /// - `Err(Box<dyn Error>)` if no DRM device is found or accessible.
-    fn open_first_available() -> Result<Self, Box<dyn Error>> {
+    /// - `Err(Box<dyn Error>)` if no functional DRM device is found.
+    fn open_available() -> Result<Self, Box<dyn Error>> {
         let dri_path = Path::new("/dev/dri/");
         info!("Searching for DRM devices in {:?}", dri_path);
 
-        debug!("Reading directory entries from {:?}", dri_path);
         let mut last_error = None;
+        let mut best_card = None;
+        let mut max_connectors = 0;
 
-        for entry in dri_path.read_dir()? {
-            let entry = match entry {
-                Ok(e) => e,
-                Err(e) => {
-                    warn!("Error reading entry in /dev/dri/: {}", e);
-                    continue;
-                }
-            };
+        for entry in dri_path.read_dir()?.filter_map(Result::ok) {
             let path = entry.path();
-            if let Some(file_name) = path.file_name() {
-                if file_name.to_string_lossy().starts_with("card") {
+            if let Some(file_name) = path.file_name().map(|f| f.to_string_lossy()) {
+                if file_name.starts_with("card") {
                     debug!("Attempting to open device: {:?}", path);
                     let mut options = OpenOptions::new();
-                    options.read(true).write(true); // Open with read/write permissions
+                    options.read(true).write(true);
+
                     match options.open(&path) {
                         Ok(file) => {
-                            info!("DRM device opened successfully: {:?}", path);
-                            debug!("File descriptor obtained for {:?}", path);
-                            // Verify if the device supports basic operations
                             let card = Card(file);
                             match card.resource_handles() {
                                 Ok(resources) => {
-                                    info!("Resources available on {:?}: {} connectors", path, resources.connectors().len());
-                                    return Ok(card);
+                                    let num_connectors = resources.connectors().len();
+                                    info!("Device {:?} opened with {} connectors.", path, num_connectors);
+
+                                    if num_connectors > max_connectors {
+                                        best_card = Some(card);
+                                        max_connectors = num_connectors;
+                                    }
                                 }
                                 Err(e) if e.raw_os_error() == Some(95) => {
-                                    warn!("Device {:?} does not support required DRM operations: {}", path, e);
+                                    debug!("Device {:?} does not support basic operations (Error 95), ignoring...", path);
                                     last_error = Some(e);
-                                    continue; // Try the next device
                                 }
                                 Err(e) => {
-                                    warn!("Error checking resources on {:?}: {}", path, e);
+                                    error!("Error obtaining resources from device {:?}: {:?}", path, e);
                                     last_error = Some(e);
-                                    continue;
                                 }
                             }
                         }
                         Err(e) => {
-                            warn!("Failed to open {:?}: {}", path, e);
+                            error!("Failed to open device {:?}: {:?}", path, e);
                             last_error = Some(e);
                         }
                     }
@@ -93,13 +89,18 @@ impl Card {
             }
         }
 
-        error!("No functional DRM device found in /dev/dri/");
-        match last_error {
-            Some(e) => Err(Box::new(e)),
-            None => Err("No DRM device found in /dev/dri/".into()),
+        if let Some(card) = best_card {
+            Ok(card)
+        } else {
+            error!("No functional DRM device found in {:?}.", dri_path);
+            Err(last_error.map_or_else(
+                || Box::<dyn Error>::from("No DRM device found or accessible"),
+                |e| Box::new(e),
+            ))
         }
     }
 }
+
 
 /// Iterates over all available connectors of the DRM device, applying a given function.
 ///
@@ -149,9 +150,8 @@ where
             match screen {
                 Some(screen_name) if format!("{:?}", connector_info.interface()) != screen_name => {
                     debug!(
-                        "Skipping connector {:?}-{:?} - doesn't match screen {}",
+                        "Skipping connector {:?} - doesn't match screen {}",
                         connector_info.interface(),
-                        connector_info.interface_id(),
                         screen_name
                     );
                     false
@@ -182,40 +182,46 @@ where
 /// println!("{}", modes);
 /// ```
 pub fn drm_list_modes(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
-    info!("Listing display modes for screen: {:?}", screen);
     debug!("Opening first available DRM card");
-    let card = Card::open_first_available()?;
+    let card = Card::open_available()?;
     let mut modes_string = String::new();
+    let mut total_modes = 0;
 
-    // Add hardcoded maximum resolutions as fallback options
-    debug!("Adding hardcoded maximum resolutions");
-    modes_string.push_str(&format!("{}", "max-1920x1080:maximum 1920x1080"));
-    modes_string.push_str(&format!("\n{}", "max-640x480:maximum 640x480"));
+    // Primeiro passamos para contar o total de modos
+    for_each_connector(&card, screen, |connector_info| {
+        total_modes += connector_info.modes().len();
+        Ok(())
+    })?;
 
+    let mut modes_processed = 0;
     debug!("Iterating over connectors to list modes");
     for_each_connector(&card, screen, |connector_info| {
         debug!(
-            "Processing connector {:?}-{:?}",
-            connector_info.interface(),
-            connector_info.interface_id()
+            "Processing connector {:?}",
+            connector_info.interface()
         );
         let modes = connector_info.modes();
         debug!("Found {} modes for connector", modes.len());
 
         for mode in modes {
+            modes_processed += 1;
             let mode_str = format!(
-                "\n{}x{}@{}:{:?}-{:?} {}x{}@{}Hz",
+                "{}x{}@{}:{:?} {}x{}@{}Hz",
                 mode.size().0,
                 mode.size().1,
                 mode.vrefresh(),
                 connector_info.interface(),
-                connector_info.interface_id(),
                 mode.size().0,
                 mode.size().1,
                 mode.vrefresh()
             );
             debug!("Adding mode: {}", mode_str.trim());
             modes_string.push_str(&mode_str);
+
+            // Adiciona nova linha apenas se não for o último modo
+            if modes_processed < total_modes {
+                modes_string.push('\n');
+            }
         }
         Ok(())
     })?;
@@ -241,18 +247,15 @@ pub fn drm_list_modes(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
 /// println!("{}", outputs);
 /// ```
 pub fn drm_list_outputs() -> Result<String, Box<dyn Error>> {
-    info!("Listing available outputs");
     debug!("Opening first available DRM card");
-    let card = Card::open_first_available()?;
+    let card = Card::open_available()?;
     let mut outputs_string = String::new();
     let mut first = true; // Used to avoid leading newline
 
     debug!("Iterating over connectors to list outputs");
     for_each_connector(&card, None, |connector_info| {
         let output_str = format!(
-            "{:?}-{:?}",
-            connector_info.interface(),
-            connector_info.interface_id()
+            "{:?}", connector_info.interface()
         );
         debug!("Found output: {}", output_str);
 
@@ -288,9 +291,8 @@ pub fn drm_list_outputs() -> Result<String, Box<dyn Error>> {
 /// println!("Current mode: {}", mode);
 /// ```
 pub fn drm_current_mode(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
-    info!("Getting current mode for screen: {:?}", screen);
     debug!("Opening first available DRM card");
-    let card = Card::open_first_available()?;
+    let card = Card::open_available()?;
     let mut current_mode_string = String::new();
 
     debug!("Iterating over connectors to find current mode");
@@ -300,9 +302,8 @@ pub fn drm_current_mode(screen: Option<&str>) -> Result<String, Box<dyn Error>> 
         |connector_info| -> Result<(), Box<dyn Error>> {
             if connector_info.state() == connector::State::Connected {
                 debug!(
-                    "Checking connected connector {:?}-{:?}",
-                    connector_info.interface(),
-                    connector_info.interface_id()
+                    "Checking connected connector {:?}",
+                    connector_info.interface()
                 );
                 if let Some(encoder_id) = connector_info.current_encoder() {
                     debug!("Fetching encoder info for ID {:?}", encoder_id);
@@ -350,9 +351,8 @@ pub fn drm_current_mode(screen: Option<&str>) -> Result<String, Box<dyn Error>> 
 /// println!("Current output: {}", output);
 /// ```
 pub fn drm_current_output() -> Result<String, Box<dyn Error>> {
-    info!("Getting current output");
     debug!("Opening first available DRM card");
-    let card = Card::open_first_available()?;
+    let card = Card::open_available()?;
     let mut current_output_string = String::new();
 
     debug!("Iterating over connectors to find current output");
@@ -362,9 +362,7 @@ pub fn drm_current_output() -> Result<String, Box<dyn Error>> {
         |connector_info| -> Result<(), Box<dyn Error>> {
             if connector_info.state() == connector::State::Connected {
                 let output_str = format!(
-                    "{:?}-{:?}",
-                    connector_info.interface(),
-                    connector_info.interface_id()
+                    "{:?}", connector_info.interface()
                 );
                 debug!("Found connected output: {}", output_str);
                 current_output_string.push_str(&output_str);
@@ -397,9 +395,8 @@ pub fn drm_current_output() -> Result<String, Box<dyn Error>> {
 /// println!("Current resolution: {}", resolution);
 /// ```
 pub fn drm_current_resolution(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
-    info!("Getting current resolution for screen: {:?}", screen);
     debug!("Opening first available DRM card");
-    let card = Card::open_first_available()?;
+    let card = Card::open_available()?;
     let mut current_resolution_string = String::new();
 
     debug!("Iterating over connectors to find current resolution");
@@ -409,9 +406,8 @@ pub fn drm_current_resolution(screen: Option<&str>) -> Result<String, Box<dyn Er
         |connector_info| -> Result<(), Box<dyn Error>> {
             if connector_info.state() == connector::State::Connected {
                 debug!(
-                    "Checking resolution for connector {:?}-{:?}",
-                    connector_info.interface(),
-                    connector_info.interface_id()
+                    "Checking resolution for connector {:?}",
+                    connector_info.interface()
                 );
                 if let Some(encoder_id) = connector_info.current_encoder() {
                     debug!("Fetching encoder info for ID {:?}", encoder_id);
@@ -458,9 +454,8 @@ pub fn drm_current_resolution(screen: Option<&str>) -> Result<String, Box<dyn Er
 /// println!("Current refresh rate: {}", refresh);
 /// ```
 pub fn drm_current_refresh(screen: Option<&str>) -> Result<String, Box<dyn Error>> {
-    info!("Getting current refresh rate for screen: {:?}", screen);
     debug!("Opening first available DRM card");
-    let card = Card::open_first_available()?;
+    let card = Card::open_available()?;
     let mut current_refresh_string = String::new();
 
     debug!("Iterating over connectors to find current refresh rate");
@@ -470,9 +465,8 @@ pub fn drm_current_refresh(screen: Option<&str>) -> Result<String, Box<dyn Error
         |connector_info| -> Result<(), Box<dyn Error>> {
             if connector_info.state() == connector::State::Connected {
                 debug!(
-                    "Checking refresh rate for connector {:?}-{:?}",
-                    connector_info.interface(),
-                    connector_info.interface_id()
+                    "Checking refresh rate for connector {:?}",
+                    connector_info.interface()
                 );
                 if let Some(encoder_id) = connector_info.current_encoder() {
                     debug!("Fetching encoder info for ID {:?}", encoder_id);
@@ -530,72 +524,66 @@ pub fn drm_set_mode(
         width, height, vrefresh, screen
     );
     debug!("Opening first available DRM card");
-    let card = Card::open_first_available()?;
-    let mut mode_set = false;
+    let card = Card::open_available()?;
 
     debug!("Iterating over connectors to set display mode");
     for_each_connector(
         &card,
         screen,
         |connector_info| -> Result<(), Box<dyn Error>> {
-            if connector_info.state() == connector::State::Connected {
-                let interface_str = format!("{:?}", connector_info.interface());
-                if let Some(screen_name) = screen {
-                    if !interface_str.contains(screen_name) {
-                        debug!(
-                            "Skipping connector {} - doesn't match screen {}",
-                            interface_str, screen_name
-                        );
-                        return Ok(());
-                    }
-                }
-                debug!("Processing connected connector: {}", interface_str);
+            if connector_info.state() != connector::State::Connected {
+                return Ok(());
+            }
 
-                if let Some(encoder_id) = connector_info.current_encoder() {
-                    debug!("Fetching encoder info for ID {:?}", encoder_id);
-                    let encoder_info = card.get_encoder(encoder_id)?;
-                    if let Some(crtc_id) = encoder_info.crtc() {
-                        debug!("Fetching CRTC info for ID {:?}", crtc_id);
-                        let crtc_info = card.get_crtc(crtc_id)?;
-                        for mode in connector_info.modes() {
-                            if mode.size().0 == width as u16
-                                && mode.size().1 == height as u16
-                                && mode.vrefresh() == vrefresh as u32
-                            {
-                                debug!("Matching mode found: {}x{}@{}Hz", width, height, vrefresh);
-                                card.set_crtc(
-                                    crtc_id,
-                                    crtc_info.framebuffer(),
-                                    (0, 0),
-                                    &[connector_info.handle()],
-                                    Some(*mode),
-                                )?;
-                                info!(
-                                    "Display mode set to {}x{}@{}Hz on {}",
-                                    width, height, vrefresh, interface_str
-                                );
-                                mode_set = true;
-                                return Ok(());
-                            }
-                        }
-                        debug!(
-                            "No matching mode found for {}x{}@{}Hz on {}",
-                            width, height, vrefresh, interface_str
-                        );
-                    }
+            let interface = format!("{:?}", connector_info.interface());
+            if let Some(screen_name) = screen {
+                if interface != screen_name {
+                    debug!("Skipping connector {} - doesn't match screen {}", interface, screen_name);
+                    return Ok(());
                 }
             }
+
+            debug!("Processing connected connector: {}", interface);
+
+            let encoder_id = match connector_info.current_encoder() {
+                Some(id) => id,
+                None => {
+                    warn!("No encoder found for connector {}", interface);
+                    return Ok(());
+                }
+            };
+
+            let encoder_info = card.get_encoder(encoder_id)?;
+            let crtc_id = match encoder_info.crtc() {
+                Some(id) => id,
+                None => {
+                    warn!("No CRTC found for encoder {:?} on {}", encoder_id, interface);
+                    return Ok(());
+                }
+            };
+
+            let crtc_info = card.get_crtc(crtc_id)?;
+            let current_fb = crtc_info.framebuffer();
+
+            let target_mode = connector_info.modes().iter().find(|mode| {
+                mode.size().0 == width as u16 &&
+                mode.size().1 == height as u16 &&
+                mode.vrefresh() == vrefresh as u32
+            }).ok_or("Mode not found")?;
+
+            card.set_crtc(
+                crtc_id,
+                current_fb,
+                (0, 0),
+                &[connector_info.handle()],
+                Some(*target_mode),
+            )?;
+
+            debug!("No matching mode found for {}x{}@{}Hz on {}", width, height, vrefresh, interface);
             Ok(())
         },
     )?;
 
-    if !mode_set {
-        error!(
-            "No matching mode found for {}x{}@{}Hz on screen {:?}",
-            width, height, vrefresh, screen
-        );
-        return Err("No matching mode found for specified screen".into());
-    }
     info!("Mode setting completed successfully");
     Ok(())
 }
@@ -614,9 +602,8 @@ pub fn drm_set_mode(
 /// drm_set_output("HDMI-A-1").unwrap();
 /// ```
 pub fn drm_set_output(output: &str) -> Result<(), Box<dyn Error>> {
-    info!("Setting output to {}", output);
     debug!("Opening first available DRM card");
-    let card = Card::open_first_available()?;
+    let card = Card::open_available()?;
     let mut found = false;
 
     debug!("Iterating over connectors to set output");
@@ -680,12 +667,8 @@ pub fn drm_set_output(output: &str) -> Result<(), Box<dyn Error>> {
 /// drm_set_rotation(Some("HDMI"), "90").unwrap();
 /// ```
 pub fn drm_set_rotation(screen: Option<&str>, rotation: &str) -> Result<(), Box<dyn Error>> {
-    info!(
-        "Starting rotation setting process for rotation '{}' on screen {:?}",
-        rotation, screen
-    );
     debug!("Opening first available DRM card");
-    let card = Card::open_first_available()?;
+    let card = Card::open_available()?;
 
     // Map rotation string to integer value
     debug!("Parsing rotation input: '{}'", rotation);
@@ -819,9 +802,8 @@ pub fn drm_to_max_resolution(
     screen: Option<&str>,
     _max_resolution: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
-    info!("Setting maximum resolution for screen: {:?}", screen);
     debug!("Opening first available DRM card");
-    let card = Card::open_first_available()?;
+    let card = Card::open_available()?;
     let mut max_width = 0;
     let mut max_height = 0;
     let mut best_mode = None;

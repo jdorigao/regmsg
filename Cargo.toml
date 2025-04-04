@@ -6,7 +6,6 @@ license = "MIT"
 name = "regmsg"
 version = "0.0.1"
 edition = "2024"
-rust-version = "1.85.1"
 
 [dependencies]
 log = "0.4.27"
