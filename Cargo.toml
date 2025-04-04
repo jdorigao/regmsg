@@ -1,22 +1,30 @@
 [package]
-authors = ["Juliano Dorigão <https://github.com/jdorigao>"]
-categories = ["command-line-utilities"]
-description = "Manages screen resolution and display settings"
-license = "MIT"
 name = "regmsg"
 version = "0.0.1"
 edition = "2024"
+authors = ["Juliano Dorigão <jdorigao@gmail.com>"]
+description = "Manages screen resolution and display settings"
+license = "MIT"
+repository = "https://github.com/jdorigao/regmsg"
+documentation = "https://github.com/jdorigao/regmsg#readme"
+homepage = "https://github.com/jdorigao"
+readme = "README.md"
+keywords = ["display", "resolution", "drm", "sway", "wayland"]
+categories = ["command-line-utilities"]
 
 [dependencies]
-log = "0.4.27"
-simplelog = "0.12.2"
-clap = "4.5.35"
-drm = "0.14.1"
-swayipc = "3.0.3"
-chrono = "0.4.40"
+log = "^0.4.27"
+simplelog = "^0.12.2"
+clap = "^4.5.35"
+drm = "^0.14.1"
+swayipc = "^3.0.3"
+chrono = "^0.4.40"
 
 [profile.release]
-lto = true          # Enable LTO.
-strip = true        # Automatically strip symbols from the binary.
-codegen-units = 1   # Use a single codegen for size optimization.
-panic = "abort"     # Remove traceback information.
+lto = true          # Enable Link Time Optimization for smaller binaries
+codegen-units = 1   # Better optimization with single codegen unit
+panic = "abort"     # Smaller binaries by removing panic infrastructure (no backtrace)
+opt-level = 3       # Maximum optimization for performance
+debug = false       # Strips all debuginfo
+strip = "symbols"   # Remove debug symbols to reduce binary size
+incremental = false # For final release builds
