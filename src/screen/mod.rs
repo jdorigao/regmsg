@@ -310,9 +310,10 @@ pub fn set_rotation(
 /// # Returns
 /// A `Result` indicating success or an error message if the operation fails.
 pub fn get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
+    let screenshot_dir = "/userdata/screenshots";
     match detect_backend() {
-        "Wayland" => wayland::wayland_get_screenshot()?,
-        "KMS/DRM" => kmsdrm::drm_get_screenshot()?,
+        "Wayland" => wayland::wayland_get_screenshot(screenshot_dir)?,
+        "KMS/DRM" => kmsdrm::drm_get_screenshot(screenshot_dir)?,
         _ => {
             debug!("Unknown backend detected.");
             println!("Unknown backend. Unable to determine display settings.");

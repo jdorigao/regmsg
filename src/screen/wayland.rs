@@ -627,7 +627,7 @@ pub fn wayland_set_rotation(
 /// ```
 /// wayland_get_screenshot()?;
 /// ```
-pub fn wayland_get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
+pub fn wayland_get_screenshot(screenshot_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
     info!("Capturing screenshot.");
     // Check if `grim` is available
     if !Command::new("grim").arg("--version").output().is_ok() {
@@ -645,7 +645,6 @@ pub fn wayland_get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("No active output found")?;
 
     // Ensure screenshot directory exists
-    let screenshot_dir = "/userdata/screenshots";
     fs::create_dir_all(screenshot_dir)?;
 
     // Generate timestamped filename

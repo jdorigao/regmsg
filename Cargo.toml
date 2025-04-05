@@ -19,6 +19,7 @@ clap = "^4.5.35"
 drm = "^0.14.1"
 swayipc = "^3.0.3"
 chrono = "^0.4.40"
+image = "^0.25.6"
 
 [profile.release]
 lto = true          # Enable Link Time Optimization for smaller binaries
