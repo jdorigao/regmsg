@@ -13,13 +13,17 @@ keywords = ["display", "resolution", "drm", "sway", "wayland"]
 categories = ["command-line-utilities"]
 
 [dependencies]
-log = "^0.4.27"
-simplelog = "^0.12.2"
-clap = "^4.5.35"
-drm = "^0.14.1"
-swayipc = "^3.0.3"
-chrono = "^0.4.40"
-image = "^0.25.6"
+log = "0.4.27"
+simplelog = "0.12.2"
+clap = "4.5.36"
+drm = "0.14.1"
+swayipc = "3.0.3"
+chrono = "0.4.40"
+image = "0.25.6"
+
+[build-dependencies]
+cc = "1.2.19"
+pkg-config = "0.3.32"
 
 [profile.release]
 lto = true          # Enable Link Time Optimization for smaller binaries

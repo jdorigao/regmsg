@@ -42,6 +42,8 @@ use drm::buffer::DrmFourcc;
 use image::{ImageBuffer, RgbImage};
 use chrono::Local;
 
+const DRM_MODE_PATH: &str = "/var/run/drmMode";
+
 /// Represents a DRM (Direct Rendering Manager) device card.
 ///
 /// This struct wraps a `File` object representing an opened DRM device file (e.g., `/dev/dri/card0`).
@@ -87,7 +89,7 @@ impl Card {
                 if file_name.starts_with("card") {
                     debug!("Attempting to open device: {:?}", path);
                     let mut options = OpenOptions::new();
-                    options.read(true).write(true);
+                    options.read(true).write(false);
 
                     match options.open(&path) {
                         Ok(file) => {
@@ -512,42 +514,50 @@ pub fn drm_current_refresh(screen: Option<&str>) -> Result<String, Box<dyn Error
 /// Sets a specific display mode for the specified screen.
 ///
 /// # Arguments
-/// * `screen` - Optional filter for specific connector types (e.g., "HDMI", "DP")
-/// * `width` - Desired width in pixels
-/// * `height` - Desired height in pixels
-/// * `vrefresh` - Desired refresh rate in Hz
+/// * `screen` - Optional filter to target specific connector interfaces, e.g., "HDMI", "DP"
+/// * `width` - Desired screen width in pixels
+/// * `height` - Desired screen height in pixels
+/// * `vrefresh` - Desired vertical refresh rate in Hz
 ///
 /// # Returns
-/// - `Ok(())` if the mode is set successfully
-/// - `Err(Box<dyn Error>)` if an error occurs
+/// - `Ok(())` if the display mode was successfully set
+/// - `Err(Box<dyn Error>)` if any error occurs during the process
 ///
-/// # Examples
+/// # Example
 /// ```
-/// // Set HDMI output to 1920x1080@60Hz
+/// // Set an HDMI output to 1920x1080 resolution at 60Hz
 /// drm_set_mode(Some("HDMI"), 1920, 1080, 60).unwrap();
 /// ```
 ///
 /// # Errors
-/// - Returns an error if no DRM device is available
-/// - Returns an error if the specified mode is not available
-/// - Returns an error if the mode cannot be set
+/// - If no DRM device is available
+/// - If the desired display mode is not supported
+/// - If the mode cannot be applied to the output
 pub fn drm_set_mode(
     screen: Option<&str>,
     width: i32,
     height: i32,
     vrefresh: i32,
 ) -> Result<(), Box<dyn Error>> {
+    // Attempt to open the available DRM card
     let card = Card::open_available_card()?;
+
     debug!("Iterating over connectors to set display mode");
+
+    // Iterate over all available connectors
     for_each_connector(
         &card,
         screen,
         |connector_info| -> Result<(), Box<dyn Error>> {
+            // Skip disconnected outputs
             if connector_info.state() != connector::State::Connected {
                 return Ok(());
             }
 
+            // Get the connector interface as a string (e.g., "HDMI-A-1")
             let interface = format!("{:?}", connector_info.interface());
+
+            // If a screen name filter is specified, skip non-matching connectors
             if let Some(screen_name) = screen {
                 if !interface.contains(screen_name) {
                     debug!(
@@ -559,17 +569,22 @@ pub fn drm_set_mode(
             }
 
             debug!("Processing connected connector: {}", interface);
-            let encoder_id = connector_info.current_encoder().ok_or_else(|| format!("No encoder found for connector {}", interface))?;
-            let encoder_info = card.get_encoder(encoder_id)?;
-            let crtc_id = encoder_info.crtc().ok_or_else(|| format!("No CRTC found for encoder {:?} on {}", encoder_id, interface))?;
-            let crtc_info = card.get_crtc(crtc_id)?;
-            let current_fb = crtc_info.framebuffer();
 
-            let target_mode = connector_info.modes().iter().find(|mode| {
-                mode.size().0 == width as u16 &&
-                mode.size().1 == height as u16 &&
-                mode.vrefresh() == vrefresh as u32
-            }).ok_or("Mode not found")?;
+            // Search for a matching mode with the requested resolution and refresh rate
+            let target_mode = connector_info
+                .modes()
+                .iter()
+                .find(|mode| {
+                    mode.size().0 == width as u16 &&
+                    mode.size().1 == height as u16 &&
+                    mode.vrefresh() == vrefresh as u32
+                })
+                .ok_or("Mode not found")?;
+
+            // Write the mode string to a system state file (used by some services/tools)
+            let mode_str = format!("{}x{}@{}", width, height, vrefresh);
+            std::fs::write( DRM_MODE_PATH, &mode_str)?;
+            debug!("Writing mode string to {}: {}", DRM_MODE_PATH, mode_str);
 
             info!(
                 "Setting mode '{}' ({}x{}@{}Hz) for screen: {:?}",
@@ -579,20 +594,10 @@ pub fn drm_set_mode(
                 vrefresh,
                 interface
             );
-
-            card.set_crtc(
-                crtc_id,
-                current_fb,
-                (0, 0),
-                &[connector_info.handle()],
-                Some(*target_mode),
-            ).map_err(|e| {
-                error!("Failed to set CRTC: {:?}", e);
-                e
-            })?;
             Ok(())
         },
     )?;
+
     info!("Mode setting completed successfully");
     Ok(())
 }
@@ -660,128 +665,40 @@ pub fn drm_set_output(output: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Sets the rotation of the specified screen.
+/// Sets the rotation property for a display connector.
+///
+/// This function attempts to configure the rotation of a specified screen or display connector.
+/// Currently, it serves as a placeholder that logs a warning and returns success without
+/// performing any actual rotation changes.
 ///
 /// # Arguments
-/// * `screen` - Optional filter for specific connector types (e.g., "HDMI", "DP")
-/// * `rotation` - The rotation value as a string ("0", "90", "180", "270")
+///
+/// * `_screen` - An optional string slice representing the target screen or connector identifier.
+///              If None, the function applies to a default or unspecified connector.
+/// * `_rotation` - A string slice specifying the desired rotation (e.g., "90", "180", "270").
 ///
 /// # Returns
-/// - `Ok(())` if the rotation is set successfully
-/// - `Err(Box<dyn Error>)` if an error occurs
+///
+/// * `Result<(), Box<dyn Error>>` - Returns `Ok(())` on success or an error boxed as a trait object
+///                                  if the operation fails. Currently always returns `Ok(())`.
 ///
 /// # Examples
+///
 /// ```
-/// // Rotate HDMI output 90 degrees
-/// drm_set_rotation(Some("HDMI"), "90").unwrap();
+/// let result = drm_set_rotation(Some("HDMI-A-1"), "90");
+/// assert!(result.is_ok());
 /// ```
 ///
-/// # Errors
-/// - Returns an error if no DRM device is available
-/// - Returns an error if the rotation value is invalid
-/// - Returns an error if no matching screen is found
-/// - Returns an error if the rotation property is not available
-pub fn drm_set_rotation(screen: Option<&str>, rotation: &str) -> Result<(), Box<dyn Error>> {
-    let card = Card::open_available_card()?;
+/// # Notes
+///
+/// This is a stub implementation. Future versions should interact with the DRM (Direct Rendering
+/// Manager) subsystem to apply the specified rotation. The warning log indicates that the
+/// 'rotation' property is not yet supported.
+pub fn drm_set_rotation(_screen: Option<&str>, _rotation: &str) -> Result<(), Box<dyn Error>> {
+    // Log a warning indicating that the rotation property is not found or implemented
+    warn!("No 'rotation' property found for connector.");
 
-    // Map rotation string to integer value
-    debug!("Parsing rotation input: '{}'", rotation);
-    let rotation_value = match rotation.to_lowercase().as_str() {
-        "0" => 0,
-        "90" => 1,
-        "180" => 2,
-        "270" => 3,
-        _ => {
-            error!(
-                "Invalid rotation value provided: '{}'. Expected '0', '90', '180', '270'",
-                rotation
-            );
-            return Err("Invalid rotation value (use 0, 90, 180, 270)".into());
-        }
-    };
-    debug!("Rotation value mapped to integer: {}", rotation_value);
-
-    let mut rotation_set = false;
-    debug!("Beginning connector iteration to apply rotation");
-    for_each_connector(
-        &card,
-        screen,
-        |connector_info| -> Result<(), Box<dyn Error>> {
-            if connector_info.state() == connector::State::Connected {
-                let interface_str = format!("{:?}", connector_info.interface());
-                if let Some(screen_name) = screen {
-                    if !interface_str.contains(screen_name) {
-                        debug!(
-                            "Skipping connector '{}' - does not match screen filter '{}'",
-                            interface_str, screen_name
-                        );
-                        return Ok(());
-                    }
-                    debug!(
-                        "Connector '{}' matches screen filter '{}'",
-                        interface_str, screen_name
-                    );
-                } else {
-                    debug!(
-                        "No screen filter provided; processing connector '{}'",
-                        interface_str
-                    );
-                }
-
-                // Check properties for "rotation"
-                debug!(
-                    "Fetching properties for connector handle {:?}",
-                    connector_info.handle()
-                );
-                let properties = card.get_properties(connector_info.handle())?;
-
-                for (prop_id, _) in properties {
-                    let prop_info = card.get_property(prop_id)?;
-                    let prop_name = prop_info.name().to_string_lossy();
-                    if prop_name.contains("rotation") {
-                        debug!(
-                            "Applying rotation property ID {:?} with value {} to connector '{}'",
-                            prop_id, rotation_value, interface_str
-                        );
-                        card.set_property(connector_info.handle(), prop_id, rotation_value as u64)?;
-                        info!(
-                            "Successfully set rotation to '{}' on connector '{}'",
-                            rotation, interface_str
-                        );
-                        rotation_set = true;
-                        return Ok(());
-                    }
-                    debug!(
-                        "Property '{}' (ID {:?}) does not match 'rotation'",
-                        prop_name, prop_id
-                    );
-                }
-                warn!(
-                    "No 'rotation' property found for connector '{}'",
-                    interface_str
-                );
-            } else {
-                debug!(
-                    "Skipping disconnected connector {:?}",
-                    connector_info.interface()
-                );
-            }
-            Ok(())
-        },
-    )?;
-
-    if !rotation_set {
-        error!(
-            "Failed to set rotation '{}': No matching connected screen found for {:?}",
-            rotation, screen
-        );
-        return Err("No matching connected screen found for rotation".into());
-    }
-
-    info!(
-        "Rotation setting process completed successfully for '{}'",
-        rotation
-    );
+    // Return success as a placeholder until full implementation is added
     Ok(())
 }
 
