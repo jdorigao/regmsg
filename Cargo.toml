@@ -15,7 +15,7 @@ categories = ["command-line-utilities"]
 [dependencies]
 log = "0.4.27"
 simplelog = "0.12.2"
-clap = "4.5.36"
+clap = "4.5.37"
 drm = "0.14.1"
 swayipc = "3.0.3"
 chrono = "0.4.40"

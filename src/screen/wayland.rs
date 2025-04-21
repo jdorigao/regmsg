@@ -839,7 +839,7 @@ pub fn wayland_min_to_max_resolution(
             if let Some(mode) = best_mode {
                 // Set the best available mode
                 let command = format!(
-                    "output {} mode {}x{}@{}",
+                    "output {} mode {}x{}@{}Hz",
                     output.name, mode.width, mode.height, format_refresh(mode.refresh)
                 );
                 for reply in connection.run_command(&command)? {
