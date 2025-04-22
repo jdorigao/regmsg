@@ -35,12 +35,9 @@ use drm::Device;
 use drm::control::{Device as ControlDevice, connector};
 use log::{debug, error, info, warn};
 use std::error::Error;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{File, OpenOptions};
 use std::os::unix::io::{AsFd, BorrowedFd};
 use std::path::Path;
-use drm::buffer::DrmFourcc;
-use image::{ImageBuffer, RgbImage};
-use chrono::Local;
 
 const DRM_MODE_PATH: &str = "/var/run/drmMode";
 
@@ -602,203 +599,18 @@ pub fn drm_set_mode(
     Ok(())
 }
 
-/// Sets the active output to a specified connector.
-///
-/// # Arguments
-/// * `output` - The name of the output to activate (e.g., "HDMI-A-1")
-///
-/// # Returns
-/// - `Ok(())` if the output is set successfully
-/// - `Err(Box<dyn Error>)` if an error occurs
-///
-/// # Examples
-/// ```
-/// drm_set_output("HDMI-A-1").unwrap();
-/// ```
-///
-/// # Errors
-/// - Returns an error if no DRM device is available
-/// - Returns an error if the specified output is not found
-/// - Returns an error if the output cannot be activated
-pub fn drm_set_output(output: &str) -> Result<(), Box<dyn Error>> {
-    let card = Card::open_available_card()?;
-    let mut found = false;
-
-    debug!("Iterating over connectors to set output");
-    for_each_connector(
-        &card,
-        None,
-        |connector_info| -> Result<(), Box<dyn Error>> {
-            let interface_str = format!("{:?}", connector_info.interface());
-            if interface_str.contains(output) {
-                debug!("Found matching output: {}", interface_str);
-                if let Some(encoder_id) = connector_info.current_encoder() {
-                    debug!("Fetching encoder info for ID {:?}", encoder_id);
-                    let encoder_info = card.get_encoder(encoder_id)?;
-                    if let Some(crtc_id) = encoder_info.crtc() {
-                        debug!("Fetching CRTC info for ID {:?}", crtc_id);
-                        let crtc_info = card.get_crtc(crtc_id)?;
-                        if let Some(mode) = crtc_info.mode() {
-                            debug!("Setting CRTC with current mode for output {}", interface_str);
-                            card.set_crtc(
-                                crtc_id,
-                                crtc_info.framebuffer(),
-                                (0, 0),
-                                &[connector_info.handle()],
-                                Some(mode),
-                            )?;
-                            info!("Output set to {}", output);
-                            found = true;
-                        }
-                    }
-                }
-            }
-            Ok(())
-        },
-    )?;
-
-    if !found {
-        error!("Output {} not found", output);
-        return Err(format!("Output {} not found", output).into());
-    }
-    info!("Output setting completed successfully");
+pub fn drm_set_output(_output: &str) -> Result<(), Box<dyn Error>> {
+    info!("TODO: Implement drm_set_output");
     Ok(())
 }
 
-/// Sets the rotation property for a display connector.
-///
-/// This function attempts to configure the rotation of a specified screen or display connector.
-/// Currently, it serves as a placeholder that logs a warning and returns success without
-/// performing any actual rotation changes.
-///
-/// # Arguments
-///
-/// * `_screen` - An optional string slice representing the target screen or connector identifier.
-///              If None, the function applies to a default or unspecified connector.
-/// * `_rotation` - A string slice specifying the desired rotation (e.g., "90", "180", "270").
-///
-/// # Returns
-///
-/// * `Result<(), Box<dyn Error>>` - Returns `Ok(())` on success or an error boxed as a trait object
-///                                  if the operation fails. Currently always returns `Ok(())`.
-///
-/// # Examples
-///
-/// ```
-/// let result = drm_set_rotation(Some("HDMI-A-1"), "90");
-/// assert!(result.is_ok());
-/// ```
-///
-/// # Notes
-///
-/// This is a stub implementation. Future versions should interact with the DRM (Direct Rendering
-/// Manager) subsystem to apply the specified rotation. The warning log indicates that the
-/// 'rotation' property is not yet supported.
 pub fn drm_set_rotation(_screen: Option<&str>, _rotation: &str) -> Result<(), Box<dyn Error>> {
-    // Log a warning indicating that the rotation property is not found or implemented
-    warn!("No 'rotation' property found for connector.");
-
-    // Return success as a placeholder until full implementation is added
+    info!("TODO: Implement drm_set_rotation");
     Ok(())
 }
 
-/// Captures a screenshot from the currently active display and saves it to a file.
-///
-/// # Arguments
-/// * `screenshot_dir` - Path where the screenshot should be saved (e.g., "screenshot.png")
-///
-/// # Returns
-/// - `Ok(())` if the screenshot is captured and saved successfully
-/// - `Err(Box<dyn Error>)` if an error occurs
-pub fn drm_get_screenshot(screenshot_dir: &str) -> Result<(), Box<dyn Error>> {
-    let card = Card::open_available_card()?;
-    let mut crtc_id = None;
-    let mut fb_info = None;
-
-    debug!("Searching for active CRTC to capture screenshot");
-    // Find an active CRTC with a framebuffer
-    for_each_connector(
-        &card,
-        None,
-        |connector_info| -> Result<(), Box<dyn Error>> {
-            if connector_info.state() == connector::State::Connected {
-                if let Some(encoder_id) = connector_info.current_encoder() {
-                    let encoder_info = card.get_encoder(encoder_id)?;
-                    if let Some(crtc) = encoder_info.crtc() {
-                        let crtc_info = card.get_crtc(crtc)?;
-                        if crtc_info.mode().is_some() && crtc_info.framebuffer().is_some() {
-                            crtc_id = Some(crtc);
-                            fb_info = Some(card.get_framebuffer(crtc_info.framebuffer().unwrap())?);
-                            debug!("Found active CRTC {:?} with framebuffer", crtc);
-                            return Ok(());
-                        }
-                    }
-                }
-            }
-            Ok(())
-        },
-    )?;
-
-    let crtc_id = crtc_id.ok_or("No active display found")?;
-    let crtc_info = card.get_crtc(crtc_id)?;
-    let mode = crtc_info.mode().ok_or("CRTC has no active mode")?;
-    let width = mode.size().0 as u32;
-    let height = mode.size().1 as u32;
-
-    debug!("Creating dumb buffer for screenshot capture");
-    // Create a dumb buffer for the screenshot
-    let mut dumb_buffer = card.create_dumb_buffer(
-        (width, height),
-        DrmFourcc::Xrgb8888, // Standard 32-bit XRGB format
-        32,                  // Bits per pixel
-    )?;
-
-    // Map the buffer to userspace
-    let map = card.map_dumb_buffer(&mut dumb_buffer)?;
-
-    // For actual framebuffer copying, you would need to implement this separately
-    // as there's no direct framebuffer_to_dumb_buffer method in the drm crate.
-    // This is a placeholder for the actual copy operation you'd need to implement:
-    debug!("[NOTE] Actual framebuffer copying would need custom implementation");
-
-    // Read the pixel data (simulated here - would need proper implementation)
-    let mut screenshot_data = vec![0; (width * height * 4) as usize];
-    unsafe {
-        std::ptr::copy_nonoverlapping(
-            map.as_ptr(),
-            screenshot_data.as_mut_ptr(),
-            screenshot_data.len(),
-        );
-    }
-
-    // Create an RGB image from the raw data
-    debug!("Converting to RGB image");
-    let img: RgbImage = ImageBuffer::from_fn(width, height, |x, y| {
-        let offset = ((y * width + x) * 4) as usize;
-        image::Rgb([
-            screenshot_data[offset + 2], // R
-            screenshot_data[offset + 1], // G
-            screenshot_data[offset],     // B
-        ])
-    });
-
-    // Ensure screenshot directory exists
-    fs::create_dir_all(screenshot_dir)?;
-
-    // Generate timestamped filename
-    let file_name = format!(
-        "{}/screenshot-{}.png",
-        screenshot_dir,
-        Local::now().format("%Y.%m.%d-%Hh%M.%S")
-    );
-
-    debug!("Saving screenshot to {}", file_name);
-    img.save(Path::new(file_name.as_str()))?;
-    info!("Successfully saved screenshot to {}", file_name);
-
-    // Clean up
-    //card.destroy_dumb_buffer(dumb_buffer)?;
-
+pub fn drm_get_screenshot(_screenshot_dir: &str) -> Result<(), Box<dyn Error>> {
+    info!("TODO: Implement drm_get_screenshot");
     Ok(())
 }
 
@@ -823,92 +635,9 @@ pub fn drm_get_screenshot(screenshot_dir: &str) -> Result<(), Box<dyn Error>> {
 /// - Returns an error if no suitable resolution is found
 /// - Returns an error if the resolution cannot be set
 pub fn drm_to_max_resolution(
-    screen: Option<&str>,
+    _screen: Option<&str>,
     _max_resolution: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
-    let card = Card::open_available_card()?;
-    let mut max_width = 0;
-    let mut max_height = 0;
-    let mut best_mode = None;
-    let mut target_connector = None;
-
-    // First pass: find the highest resolution mode
-    debug!("Iterating over connectors to find maximum resolution");
-    for_each_connector(
-        &card,
-        screen,
-        |connector_info| -> Result<(), Box<dyn Error>> {
-            if connector_info.state() == connector::State::Connected {
-                let interface_str = format!("{:?}", connector_info.interface());
-                if let Some(screen_name) = screen {
-                    if !interface_str.contains(screen_name) {
-                        debug!(
-                            "Skipping connector {} - doesn't match screen {}",
-                            interface_str, screen_name
-                        );
-                        return Ok(());
-                    }
-                }
-                debug!("Processing connected connector: {}", interface_str);
-
-                for mode in connector_info.modes() {
-                    if mode.size().0 > max_width
-                        || (mode.size().0 == max_width && mode.size().1 > max_height)
-                    {
-                        max_width = mode.size().0;
-                        max_height = mode.size().1;
-                        best_mode = Some(*mode);
-                        target_connector = Some(connector_info.handle());
-                        debug!("Found better resolution: {}x{}", max_width, max_height);
-                    }
-                }
-            }
-            Ok(())
-        },
-    )?;
-
-    // Second pass: apply the best mode found
-    if let (Some(mode), Some(connector_handle)) = (best_mode, target_connector) {
-        debug!("Best mode found: {}x{}", max_width, max_height);
-        debug!("Iterating over connectors to apply maximum resolution");
-        for_each_connector(
-            &card,
-            screen,
-            |connector_info| -> Result<(), Box<dyn Error>> {
-                if connector_info.handle() == connector_handle {
-                    if let Some(encoder_id) = connector_info.current_encoder() {
-                        debug!("Fetching encoder info for ID {:?}", encoder_id);
-                        let encoder_info = card.get_encoder(encoder_id)?;
-                        if let Some(crtc_id) = encoder_info.crtc() {
-                            debug!("Fetching CRTC info for ID {:?}", crtc_id);
-                            let crtc_info = card.get_crtc(crtc_id)?;
-                            debug!(
-                                "Setting CRTC to max resolution {}x{}",
-                                max_width, max_height
-                            );
-                            card.set_crtc(
-                                crtc_id,
-                                crtc_info.framebuffer(),
-                                (0, 0),
-                                &[connector_info.handle()],
-                                Some(mode),
-                            )?;
-                            info!(
-                                "Set to max resolution {}x{} on {:?}",
-                                max_width,
-                                max_height,
-                                connector_info.interface()
-                            );
-                        }
-                    }
-                }
-                Ok(())
-            },
-        )?;
-    } else {
-        error!("No suitable resolution found for screen {:?}", screen);
-        return Err("No suitable resolution found for specified screen".into());
-    }
-    info!("Maximum resolution setting completed successfully");
+    info!("TODO: Implement drm_to_max_resolution");
     Ok(())
 }
