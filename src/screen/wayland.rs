@@ -1,9 +1,10 @@
 use chrono::Local;
 use log::{debug, error, info, warn};
+use std::cmp::min;
 use std::collections::HashMap;
 use std::fs;
 use std::process::Command;
-use swayipc::{Connection, Mode, Output};
+use swayipc::{Connection, Output};
 
 /// Pre-processes a vector of outputs into a HashMap for efficient lookup by name.
 ///
@@ -314,10 +315,7 @@ pub fn wayland_current_resolution(
     for (i, output) in filtered_outputs.into_iter().enumerate() {
         if let Some(current_mode) = output.current_mode {
             // Format resolution as width x height x name
-            resolution_string.push_str(&format!(
-                "{}x{}",
-                current_mode.width, current_mode.height
-            ));
+            resolution_string.push_str(&format!("{}x{}", current_mode.width, current_mode.height));
             // Add a newline except after the last output
             if i < total_outputs - 1 {
                 resolution_string.push_str("\n");
@@ -822,25 +820,21 @@ pub fn wayland_min_to_max_resolution(
                 return Ok(());
             }
 
-            // Find the best mode within the specified limits
-            let mut best_mode: Option<&Mode> = None;
-            for mode in &output.modes {
-                if mode.width <= max_width && mode.height <= max_height {
-                    if let Some(best) = best_mode {
-                        if mode.width * mode.height > best.width * best.height {
-                            best_mode = Some(mode);
-                        }
-                    } else {
-                        best_mode = Some(mode);
-                    }
-                }
-            }
+            // Find the best mode within the specified vertical limit
+            let best_mode = output
+                .modes
+                .iter()
+                .filter(|mode| min(mode.width, mode.height) <= max_height)
+                .max_by_key(|mode| mode.width * mode.height);
 
             if let Some(mode) = best_mode {
                 // Set the best available mode
                 let command = format!(
                     "output {} mode {}x{}@{}Hz",
-                    output.name, mode.width, mode.height, format_refresh(mode.refresh)
+                    output.name,
+                    mode.width,
+                    mode.height,
+                    format_refresh(mode.refresh)
                 );
                 for reply in connection.run_command(&command)? {
                     if let Err(error) = reply {
