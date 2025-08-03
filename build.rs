@@ -46,7 +46,15 @@ fn main() {
     build
         .get_compiler()
         .to_command()
-        .args(["-shared", "-fPIC", "lib/drmhook.c", "-o", &out_lib, "-ldrm", "-ldl"])
+        .args([
+            "-shared",
+            "-fPIC",
+            "lib/drmhook.c",
+            "-o",
+            &out_lib,
+            "-ldrm",
+            "-ldl",
+        ])
         .args(&objects)
         .status()
         .expect("Failed to execute compiler command");
@@ -58,12 +66,10 @@ fn main() {
     let final_copy_path = format!("target/{}/{}", profile, lib_name);
 
     // Create the target/profile directory if it doesn't exist.
-    fs::create_dir_all(format!("target/{}", profile))
-        .expect("Failed to create target directory");
+    fs::create_dir_all(format!("target/{}", profile)).expect("Failed to create target directory");
 
     // Copy the compiled library to the target/profile directory for debugging or manual access.
-    fs::copy(&lib_path, &final_copy_path)
-        .expect("Failed to copy library to target directory");
+    fs::copy(&lib_path, &final_copy_path).expect("Failed to copy library to target directory");
 
     // Instruct Cargo to link against the compiled library by specifying the search path.
     println!("cargo:rustc-link-search=native={}", out_dir);

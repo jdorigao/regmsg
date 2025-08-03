@@ -93,7 +93,7 @@ fn parse_mode(mode: &str) -> Result<ModeInfo, Box<dyn std::error::Error>> {
 pub fn list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
     let result = match detect_backend() {
         "Wayland" => wayland::wayland_list_modes(screen), // Delegate to Wayland-specific implementation
-        "KMS/DRM" => kmsdrm::drm_list_modes(screen),      // Delegate to KMS/DRM-specific implementation
+        "KMS/DRM" => kmsdrm::drm_list_modes(screen), // Delegate to KMS/DRM-specific implementation
         _ => {
             debug!("Unknown backend detected.");
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())

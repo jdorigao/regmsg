@@ -94,7 +94,10 @@ impl Card {
                             match card.resource_handles() {
                                 Ok(resources) => {
                                     let num_connectors = resources.connectors().len();
-                                    info!("Device {:?} opened with {} connectors.", path, num_connectors);
+                                    info!(
+                                        "Device {:?} opened with {} connectors.",
+                                        path, num_connectors
+                                    );
 
                                     if num_connectors > max_connectors {
                                         best_card = Some(card);
@@ -102,11 +105,17 @@ impl Card {
                                     }
                                 }
                                 Err(e) if e.raw_os_error() == Some(95) => {
-                                    debug!("Device {:?} doesn't support basic operations (Error 95), ignoring...", path);
+                                    debug!(
+                                        "Device {:?} doesn't support basic operations (Error 95), ignoring...",
+                                        path
+                                    );
                                     last_error = Some(e);
                                 }
                                 Err(e) => {
-                                    error!("Error obtaining resources from device {:?}: {:?}", path, e);
+                                    error!(
+                                        "Error obtaining resources from device {:?}: {:?}",
+                                        path, e
+                                    );
                                     last_error = Some(e);
                                 }
                             }
@@ -161,27 +170,28 @@ where
 
     connectors
         .iter()
-        .filter_map(|&connector_handle| {
-            match drm_device.get_connector(connector_handle, true) {
+        .filter_map(
+            |&connector_handle| match drm_device.get_connector(connector_handle, true) {
                 Ok(connector_info) => Some(connector_info),
                 Err(e) => {
-                    warn!("Failed to get info for connector {:?}: {}", connector_handle, e);
+                    warn!(
+                        "Failed to get info for connector {:?}: {}",
+                        connector_handle, e
+                    );
                     None
                 }
+            },
+        )
+        .filter(|connector_info| match screen {
+            Some(screen_name) if format!("{:?}", connector_info.interface()) != screen_name => {
+                debug!(
+                    "Skipping connector {:?} - doesn't match screen {}",
+                    connector_info.interface(),
+                    screen_name
+                );
+                false
             }
-        })
-        .filter(|connector_info| {
-            match screen {
-                Some(screen_name) if format!("{:?}", connector_info.interface()) != screen_name => {
-                    debug!(
-                        "Skipping connector {:?} - doesn't match screen {}",
-                        connector_info.interface(),
-                        screen_name
-                    );
-                    false
-                }
-                _ => true,
-            }
+            _ => true,
         })
         .try_for_each(|connector_info| f(&connector_info))?;
 
@@ -319,7 +329,10 @@ pub fn drm_current_mode(screen: Option<&str>) -> Result<String, Box<dyn Error>> 
         screen,
         |connector_info| -> Result<(), Box<dyn Error>> {
             if connector_info.state() == connector::State::Connected {
-                debug!("Checking connected connector {:?}", connector_info.interface());
+                debug!(
+                    "Checking connected connector {:?}",
+                    connector_info.interface()
+                );
                 if let Some(encoder_id) = connector_info.current_encoder() {
                     debug!("Fetching encoder info for ID {:?}", encoder_id);
                     let encoder_info = card.get_encoder(encoder_id)?;
@@ -327,12 +340,8 @@ pub fn drm_current_mode(screen: Option<&str>) -> Result<String, Box<dyn Error>> 
                         debug!("Fetching CRTC info for ID {:?}", crtc_id);
                         let crtc_info = card.get_crtc(crtc_id)?;
                         if let Some(mode) = crtc_info.mode() {
-                            let mode_str = format!(
-                                "{}x{}@{}",
-                                mode.size().0,
-                                mode.size().1,
-                                mode.vrefresh()
-                            );
+                            let mode_str =
+                                format!("{}x{}@{}", mode.size().0, mode.size().1, mode.vrefresh());
                             debug!("Current mode found: {}", mode_str);
                             current_mode_string.push_str(&mode_str);
                         } else {
@@ -424,7 +433,10 @@ pub fn drm_current_resolution(screen: Option<&str>) -> Result<String, Box<dyn Er
         screen,
         |connector_info| -> Result<(), Box<dyn Error>> {
             if connector_info.state() == connector::State::Connected {
-                debug!("Checking resolution for connector {:?}", connector_info.interface());
+                debug!(
+                    "Checking resolution for connector {:?}",
+                    connector_info.interface()
+                );
                 if let Some(encoder_id) = connector_info.current_encoder() {
                     debug!("Fetching encoder info for ID {:?}", encoder_id);
                     let encoder_info = card.get_encoder(encoder_id)?;
@@ -447,7 +459,10 @@ pub fn drm_current_resolution(screen: Option<&str>) -> Result<String, Box<dyn Er
         warn!("No current resolution found for screen: {:?}", screen);
         current_resolution_string.push_str("No current resolution found.");
     } else {
-        info!("Current resolution retrieved: {}", current_resolution_string);
+        info!(
+            "Current resolution retrieved: {}",
+            current_resolution_string
+        );
     }
     Ok(current_resolution_string)
 }
@@ -480,7 +495,10 @@ pub fn drm_current_refresh(screen: Option<&str>) -> Result<String, Box<dyn Error
         screen,
         |connector_info| -> Result<(), Box<dyn Error>> {
             if connector_info.state() == connector::State::Connected {
-                debug!("Checking refresh rate for connector {:?}", connector_info.interface());
+                debug!(
+                    "Checking refresh rate for connector {:?}",
+                    connector_info.interface()
+                );
                 if let Some(encoder_id) = connector_info.current_encoder() {
                     debug!("Fetching encoder info for ID {:?}", encoder_id);
                     let encoder_info = card.get_encoder(encoder_id)?;
@@ -572,15 +590,15 @@ pub fn drm_set_mode(
                 .modes()
                 .iter()
                 .find(|mode| {
-                    mode.size().0 == width as u16 &&
-                    mode.size().1 == height as u16 &&
-                    mode.vrefresh() == vrefresh as u32
+                    mode.size().0 == width as u16
+                        && mode.size().1 == height as u16
+                        && mode.vrefresh() == vrefresh as u32
                 })
                 .ok_or("Mode not found")?;
 
             // Write the mode string to a system state file (used by some services/tools)
             let mode_str = format!("{}x{}@{}", width, height, vrefresh);
-            std::fs::write( DRM_MODE_PATH, &mode_str)?;
+            std::fs::write(DRM_MODE_PATH, &mode_str)?;
             debug!("Writing mode string to {}: {}", DRM_MODE_PATH, mode_str);
 
             info!(

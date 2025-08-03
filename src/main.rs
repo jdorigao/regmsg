@@ -76,7 +76,7 @@ fn main() {
         loggers.push(TermLogger::new(
             LevelFilter::Info, // Log info-level messages
             Config::default(),
-            TerminalMode::Mixed, // Output logs to both stdout and stderr
+            TerminalMode::Mixed,          // Output logs to both stdout and stderr
             simplelog::ColorChoice::Auto, // Use color output if terminal supports it
         ));
     }
@@ -90,7 +90,7 @@ fn main() {
     // Match and execute the selected subcommand
     if let Err(e) = match matches.subcommand() {
         Some(("listModes", _)) => screen::list_modes(screen), // List available display modes
-        Some(("listOutputs", _)) => screen::list_outputs(), // List available outputs
+        Some(("listOutputs", _)) => screen::list_outputs(),   // List available outputs
         Some(("currentMode", _)) => screen::current_mode(screen), // Show current display mode
         Some(("currentOutput", _)) => screen::current_output(), // Show current output
         Some(("currentResolution", _)) => screen::current_resolution(screen), // Show current resolution
