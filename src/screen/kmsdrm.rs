@@ -627,6 +627,11 @@ pub fn drm_set_rotation(_screen: Option<&str>, _rotation: &str) -> Result<(), Bo
     Ok(())
 }
 
+pub fn drm_current_rotation(_screen: Option<&str>) -> Result<String, Box<dyn Error>> {
+    info!("TODO: Implement drm_current_rotation");
+    Ok("0".to_string())
+}
+
 pub fn drm_get_screenshot(_screenshot_dir: &str) -> Result<(), Box<dyn Error>> {
     info!("TODO: Implement drm_get_screenshot");
     Ok(())

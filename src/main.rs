@@ -30,6 +30,7 @@ fn main() {
         .subcommand(Command::new("currentMode").about("Displays the current display mode for the specified screen."))
         .subcommand(Command::new("currentOutput").about("Displays the current output (e.g., HDMI, VGA)."))
         .subcommand(Command::new("currentResolution").about("Displays the current resolution for the specified screen."))
+        .subcommand(Command::new("currentRotation").about("Displays the current screen rotation for the specified screen."))
         .subcommand(Command::new("currentRefresh").about("Displays the current refresh rate for the specified screen."))
         .subcommand(Command::new("currentBackend").about("Displays the current window system."))
         .subcommand(
@@ -94,6 +95,7 @@ fn main() {
         Some(("currentMode", _)) => screen::current_mode(screen), // Show current display mode
         Some(("currentOutput", _)) => screen::current_output(), // Show current output
         Some(("currentResolution", _)) => screen::current_resolution(screen), // Show current resolution
+        Some(("currentRotation", _)) => screen::current_rotation(screen), // Show current rotation
         Some(("currentRefresh", _)) => screen::current_refresh(screen), // Show current refresh rate
         Some(("currentBackend", _)) => screen::current_backend(), // Show current window system
         Some(("setMode", sub_matches)) => {

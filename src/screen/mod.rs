@@ -212,6 +212,29 @@ pub fn current_refresh(screen: Option<&str>) -> Result<String, Box<dyn std::erro
     Ok(result)
 }
 
+/// Displays the current rotation for the specified screen.
+///
+/// This function retrieves the current rotation angle (0, 90, 180, or 270 degrees) for the given screen.
+/// The result is printed to the console and returned as a string.
+///
+/// # Arguments
+/// * `screen` - An optional string specifying the screen to query.
+///
+/// # Returns
+/// A `Result` containing a string with the current rotation, or an error message if the query fails.
+pub fn current_rotation(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
+    let result = match detect_backend() {
+        "Wayland" => wayland::wayland_current_rotation(screen),
+        "KMS/DRM" => kmsdrm::drm_current_rotation(screen),
+        _ => {
+            debug!("Unknown backend detected.");
+            Ok("Unknown backend. Unable to determine display settings.\n".to_string())
+        }
+    }?;
+    println!("{}", result);
+    Ok(result)
+}
+
 /// Sets the display mode for the specified screen.
 ///
 /// This function allows setting a specific display mode (resolution and refresh rate) or a maximum resolution

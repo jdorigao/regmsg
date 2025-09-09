@@ -864,3 +864,59 @@ pub fn wayland_min_to_max_resolution(
     );
     Ok(())
 }
+
+/// Gets the current rotation for a specific screen (or all screens).
+///
+/// This function retrieves the current rotation for the specified screen (or all screens if none specified),
+/// using `filter_outputs` to target relevant outputs.
+///
+/// # Arguments
+/// * `screen` - An optional screen name to filter the rotation for a specific screen (e.g., "eDP-1").
+///
+/// # Returns
+/// A `Result` containing a formatted string with the current rotation (e.g., "0", "90", "180", or "270") or an error.
+///
+/// # Errors
+/// Returns an error if the connection to the Wayland server fails.
+///
+/// # Examples
+/// ```rust
+/// let rotation = wayland_current_rotation(Some("eDP-1"))?;
+/// println!("{}", rotation); // Outputs something like "90"
+/// ```
+pub fn wayland_current_rotation(
+    screen: Option<&str>,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let mut connection = Connection::new()?;
+    let outputs: Vec<Output> = connection.get_outputs()?;
+
+    let mut rotation_string = String::new();
+    let filtered_outputs: Vec<_> = filter_outputs(outputs, screen).collect();
+    let total_outputs = filtered_outputs.len();
+
+    // Iterate over filtered outputs
+    for (i, output) in filtered_outputs.into_iter().enumerate() {
+        // The swayipc::Mode struct does not have a rotation field.
+        // Instead, rotation/transform is a property of the Output itself.
+        // See swayipc::Output::transform (usually an enum or string).
+        // We'll print the transform field if available.
+        match &output.transform {
+            Some(transform) => rotation_string.push_str(transform),
+            None => rotation_string.push_str("Unknown"),
+        }
+        // Add a newline except after the last output
+        if i < total_outputs - 1 {
+            rotation_string.push('\n');
+        }
+    }
+
+    if rotation_string.is_empty() {
+        // Warn if no output is found and provide a fallback message
+        warn!("No output found for the specified screen.");
+        rotation_string.push_str("No rotation info found.");
+    } else {
+        info!("Rotation retrieved successfully.");
+    }
+    // Return the formatted string wrapped in a Result
+    Ok(rotation_string)
+}
