@@ -1,12 +1,42 @@
-use clap::{Arg, Command}; // Importing command-line argument parsing utilities
-use simplelog::{CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode, WriteLogger}; // Importing logging utilities
-use std::fs::OpenOptions; // For file handling
+#![cfg(feature = "daemon")]
+//use simplelog::{CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode, WriteLogger}; // Importing logging utilities
+//use std::fs::OpenOptions; // For file handling
+
+use zmq::{Context, REP};
+use std::fs;
 
 mod screen; // Importing the screen module
 
 fn main() {
+    let socket_path = "/var/run/regmsgd.sock";
+
+    // Remove existing socket file if any
+    let _ = fs::remove_file(socket_path);
+
+    // Create ZMQ context
+    let context = Context::new();
+
+    // Create REP socket (reply)
+    let socket = context.socket(REP).expect("Failed to create socket");
+    socket.bind(&format!("ipc://{}", socket_path)).expect("Failed to bind socket");
+    println!("Daemon running on ipc://{} ...", socket_path);
+
+    loop {
+        // Receive message
+        let msg = socket.recv_string(0).expect("Failed to receive message");
+        match msg {
+            Ok(msg) => {
+                println!("Received: {}", msg);
+                // Reply back
+                let reply = format!("Echo: {}", msg);
+                socket.send(&reply, 0).expect("Failed to send reply");
+            }
+            Err(e) => eprintln!("Error receiving message: {:?}", e),
+        }
+    }
+
     // Configure and parse command-line arguments
-    let matches = Command::new("regmsg")
+    /*let matches = Command::new("regmsg")
         .version("0.0.2") // Application version
         .author("Juliano Dorigão") // Author information
         .about("A tool to manage screen resolution and display settings.") // Short description
@@ -127,5 +157,5 @@ fn main() {
         // Handle errors from function execution
         eprintln!("Error: {}", e);
         std::process::exit(1);
-    }
+    }*/
 }
