@@ -1,231 +1,151 @@
 #![cfg(feature = "cli")]
-use clap::{Arg, Command, Subcommand, Parser}; // Importing command-line argument parsing utilities
-use simplelog::{CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode, WriteLogger}; // Importing logging utilities
-use std::fs::OpenOptions; // For file handling
 
-/// Simple CLI for sending all arguments over ZeroMQ
+use clap::{Parser, Subcommand};
+use simplelog::{CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode, WriteLogger};
+use std::fs::OpenOptions;
+
+/// Arguments globaux de la CLI
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
-struct Args {
-    /// All remaining command-line arguments
+struct Cli {
+    /// Identifiant de l'écran cible (optionnel)
+    #[arg(short, long)]
+    screen: Option<String>,
+
+    /// Active le logging terminal
+    #[arg(short, long)]
+    log: bool,
+
+    /// Sous-commande à exécuter
+    #[command(subcommand)]
+    command: Commands,
+
+    /// Arguments supplémentaires transmis au démon
     #[arg(last = true)]
     args: Vec<String>,
 }
 
-#[derive(Parser, Debug)]
-#[command(author, version, about)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-
-    /// Optional screen identifier for commands that need it
-    #[arg(short, long)]
-    screen: Option<String>,
-}
-
+/// Liste des sous-commandes disponibles
 #[derive(Subcommand, Debug)]
 enum Commands {
-    #[command(name = "listModes")]
     ListModes,
-
-    #[command(name = "listOutputs")]
     ListOutputs,
-
-    #[command(name = "currentMode")]
     CurrentMode,
-
-    #[command(name = "currentOutput")]
     CurrentOutput,
-
-    #[command(name = "currentResolution")]
     CurrentResolution,
-
-    #[command(name = "currentRotation")]
     CurrentRotation,
-
-    #[command(name = "currentRefresh")]
     CurrentRefresh,
-
-    #[command(name = "currentBackend")]
     CurrentBackend,
-
-    #[command(name = "setMode")]
-    SetMode {
-        /// Mode to set
-        mode: String,
-    },
-
-    #[command(name = "setOutput")]
-    SetOutput {
-        /// Output to set
-        output: String,
-    },
-
-    #[command(name = "setRotation")]
+    SetMode { mode: String },
+    SetOutput { output: String },
     SetRotation {
-        /// Rotation to set
+        #[arg(value_parser = ["0", "90", "180", "270"])]
         rotation: String,
     },
-
-    #[command(name = "getScreenshot")]
     GetScreenshot,
-
-    #[command(name = "mapTouchScreen")]
     MapTouchScreen,
-
-    #[command(name = "minToMaxResolution")]
     MinToMaxResolution,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Configure and parse command-line arguments
-    let matches = Command::new("regmsg")
-        .version("0.0.2") // Application version
-        .author("Juliano Dorigão") // Author information
-        .about("A tool to manage screen resolution and display settings.") // Short description
-        .arg(
-            Arg::new("screen") // Argument for specifying the screen
-                .short('s')
-                .long("screen")
-                .help("Specifies the screen to apply the command to. Use this option to target a specific screen.")
-                .global(true), // Available for all subcommands
-        )
-        .arg(
-            Arg::new("log") // Enable logging flag
-                .short('l')
-                .long("log")
-                .help("Enables detailed logging to the terminal")
-                .action(clap::ArgAction::SetTrue), // Sets flag to true when used
-        )
-        // Subcommands for different functionalities
-        .subcommand(Command::new("listModes").about("Lists all available display modes for the specified screen."))
-        .subcommand(Command::new("listOutputs").about("Lists all available outputs (e.g., HDMI, VGA)."))
-        .subcommand(Command::new("currentMode").about("Displays the current display mode for the specified screen."))
-        .subcommand(Command::new("currentOutput").about("Displays the current output (e.g., HDMI, VGA)."))
-        .subcommand(Command::new("currentResolution").about("Displays the current resolution for the specified screen."))
-        .subcommand(Command::new("currentRotation").about("Displays the current screen rotation for the specified screen."))
-        .subcommand(Command::new("currentRefresh").about("Displays the current refresh rate for the specified screen."))
-        .subcommand(Command::new("currentBackend").about("Displays the current window system."))
-        .subcommand(
-            Command::new("setMode") // Set a specific display mode
-                .about("Sets the display mode for the specified screen.")
-                .arg(Arg::new("MODE").required(true).help("The display mode to set (e.g., 1920x1080@60).")),
-        )
-        .subcommand(
-            Command::new("setOutput") // Set output resolution and refresh rate
-                .about("Sets the output resolution and refresh rate (e.g., WxH@R or WxH).")
-                .arg(Arg::new("OUTPUT").required(true).help("The output resolution and refresh rate to set (e.g., 1920x1080@60).")),
-        )
-        .subcommand(
-            Command::new("setRotation") // Set screen rotation
-                .about("Sets the screen rotation for the specified screen.")
-                .arg(
-                    Arg::new("ROTATION")
-                        .required(true)
-                        .value_parser(["0", "90", "180", "270"]) // Only allow valid angles
-                        .help("The rotation angle to set (0, 90, 180, or 270 degrees)."),
-                ),
-        )
-        .subcommand(Command::new("getScreenshot").about("Takes a screenshot of the current screen."))
-        .subcommand(Command::new("mapTouchScreen").about("Maps the touchscreen to the correct display."))
-        .subcommand(Command::new("minTomaxResolution").about("Sets the screen resolution to the maximum supported resolution (e.g., 1920x1080)."))
-        .get_matches(); // Parse arguments
-
-    // Set up logging
+/// Configure le logging fichier + terminal
+fn init_logging(enable_terminal: bool) {
     let mut loggers: Vec<Box<dyn simplelog::SharedLogger>> = vec![
-        // File logger: logs all debug-level messages to /var/log/regmsg.log
         WriteLogger::new(
-            LevelFilter::Debug, // Log all debug-level messages
+            LevelFilter::Debug,
             Config::default(),
             OpenOptions::new()
-                .create(true) // Create file if it doesn't exist
-                .append(true) // Append instead of overwriting
+                .create(true)
+                .append(true)
                 .open("/var/log/regmsg.log")
-                .expect("Failed to open log file in append mode"), // Handle failure
+                .expect("Impossible d'ouvrir /var/log/regmsg.log"),
         ),
     ];
 
-    // Enable terminal logging if --log flag is set
-    if matches.get_flag("log") {
+    if enable_terminal {
         loggers.push(TermLogger::new(
-            LevelFilter::Info, // Log info-level messages
+            LevelFilter::Info,
             Config::default(),
-            TerminalMode::Mixed,          // Output logs to both stdout and stderr
-            simplelog::ColorChoice::Auto, // Use color output if terminal supports it
+            TerminalMode::Mixed,
+            simplelog::ColorChoice::Auto,
         ));
     }
 
-    // Initialize the combined logger
-    CombinedLogger::init(loggers).expect("Failed to initialize logger");
+    CombinedLogger::init(loggers).expect("Impossible d'initialiser le logger");
+}
 
-    // Get screen argument if provided
-    let screen = matches.get_one::<String>("screen").map(|s| s.as_str());
+/// Point d’entrée
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let cli = Cli::parse();
 
-    // Connect to daemon via ZeroMQ
+    // Init logging
+    init_logging(cli.log);
+
+    // Connexion au démon via ZeroMQ
     let ctx = zmq::Context::new();
     let socket = ctx.socket(zmq::REQ)?;
-    socket.connect("ipc:///tmp/regmsg.sock")?;
+    socket.connect("ipc:///var/run/regmsgd.sock")?;
 
-    // Parse command-line arguments
-    let commands = Cli::parse();
-    let cli = Args::parse();
-
-    // Construct and send request
-    let msg = cli.args.join(" ");
-    println!("Sending message: {}", msg);
-    socket.send(&msg, 0);
-
-    // Receive reply
-    let reply = socket.recv_string(0)?;
-
-    // Print nicely (stdout for piping / legacy scripts)
-    match reply {
-        Ok(text) => println!("{}", text),
-        Err(bytes) => println!("Error in reply (non-UTF8): {:?}", bytes),
+    // Exécution de la commande
+    if let Err(e) = handle_command(&cli, &socket) {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
     }
 
     Ok(())
 }
 
-/*fn main() {
-    // Match and execute the selected subcommand
-    if let Err(e) = match matches.subcommand() {
-        Some(("listModes", _)) => screen::list_modes(screen), // List available display modes
-        Some(("listOutputs", _)) => screen::list_outputs(),   // List available outputs
-        Some(("currentMode", _)) => screen::current_mode(screen), // Show current display mode
-        Some(("currentOutput", _)) => screen::current_output(), // Show current output
-        Some(("currentResolution", _)) => screen::current_resolution(screen), // Show current resolution
-        Some(("currentRotation", _)) => screen::current_rotation(screen), // Show current rotation
-        Some(("currentRefresh", _)) => screen::current_refresh(screen), // Show current refresh rate
-        Some(("currentBackend", _)) => screen::current_backend(), // Show current window system
-        Some(("setMode", sub_matches)) => {
-            let mode = sub_matches.get_one::<String>("MODE").unwrap(); // Retrieve mode argument
-            screen::set_mode(screen, mode).map(|_| "Mode set successfully".to_string()) // Set the mode
+/// Exécute la sous-commande sélectionnée
+fn handle_command(cli: &Cli, socket: &zmq::Socket) -> Result<(), Box<dyn std::error::Error>> {
+    let mut msg = String::new();
+
+    // Construire la commande en fonction de l'enum
+    match &cli.command {
+        Commands::ListModes => msg.push_str("listModes"),
+        Commands::ListOutputs => msg.push_str("listOutputs"),
+        Commands::CurrentMode => msg.push_str("currentMode"),
+        Commands::CurrentOutput => msg.push_str("currentOutput"),
+        Commands::CurrentResolution => msg.push_str("currentResolution"),
+        Commands::CurrentRotation => msg.push_str("currentRotation"),
+        Commands::CurrentRefresh => msg.push_str("currentRefresh"),
+        Commands::CurrentBackend => msg.push_str("currentBackend"),
+        Commands::SetMode { mode } => {
+            msg.push_str("setMode ");
+            msg.push_str(mode);
         }
-        Some(("setOutput", sub_matches)) => {
-            let output = sub_matches.get_one::<String>("OUTPUT").unwrap(); // Retrieve output argument
-            screen::set_output(output).map(|_| "Output set successfully".to_string()) // Set the output
+        Commands::SetOutput { output } => {
+            msg.push_str("setOutput ");
+            msg.push_str(output);
         }
-        Some(("setRotation", sub_matches)) => {
-            let rotation = sub_matches.get_one::<String>("ROTATION").unwrap(); // Retrieve rotation argument
-            screen::set_rotation(screen, rotation).map(|_| "Rotation set successfully".to_string()) // Set rotation
+        Commands::SetRotation { rotation } => {
+            msg.push_str("setRotation ");
+            msg.push_str(rotation);
         }
-        Some(("getScreenshot", _)) => {
-            screen::get_screenshot().map(|_| "Screenshot taken successfully".to_string()) // Capture a screenshot
-        }
-        Some(("mapTouchScreen", _)) => {
-            screen::map_touch_screen().map(|_| "Touch screen successfully mapped".to_string()) // Map touchscreen
-        }
-        Some(("minTomaxResolution", _)) => screen::min_to_max_resolution(screen)
-            .map(|_| "Resolution set to maximum successfully".to_string()), // Set max resolution
-        _ => {
-            // Handle unknown subcommands
-            eprintln!("Invalid command. Use --help for usage information.");
-            std::process::exit(1); // Exit with error code
-        }
-    } {
-        // Handle errors from function execution
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
+        Commands::GetScreenshot => msg.push_str("getScreenshot"),
+        Commands::MapTouchScreen => msg.push_str("mapTouchScreen"),
+        Commands::MinToMaxResolution => msg.push_str("minToMaxResolution"),
     }
-}*/
+
+    // Ajouter --screen si précisé
+    if let Some(screen) = &cli.screen {
+        msg.push_str(" --screen ");
+        msg.push_str(screen);
+    }
+
+    // Ajouter arguments supplémentaires
+    if !cli.args.is_empty() {
+        msg.push(' ');
+        msg.push_str(&cli.args.join(" "));
+    }
+
+    // Envoyer la commande au démon
+    socket.send(&msg, 0)?;
+
+    // Réception et affichage
+    let reply = socket.recv_string(0)?;
+    match reply {
+        Ok(text) => println!("{text}"),
+        Err(bytes) => println!("Error in reply (non-UTF8): {:?}", bytes),
+    }
+
+    Ok(())
+}
