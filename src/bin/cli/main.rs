@@ -27,6 +27,7 @@ struct Cli {
 
 /// Liste des sous-commandes disponibles
 #[derive(Subcommand, Debug)]
+#[command(rename_all = "camelCase")] // <--- all variants become camelCase
 enum Commands {
     ListModes,
     ListOutputs,
