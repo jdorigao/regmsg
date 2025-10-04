@@ -99,7 +99,6 @@ pub fn list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::error::Er
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
         }
     }?;
-    println!("{}", result); // Output the result to the console for user visibility
     Ok(result)
 }
 
@@ -119,7 +118,6 @@ pub fn list_outputs() -> Result<String, Box<dyn std::error::Error>> {
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
         }
     }?;
-    println!("{}", result);
     Ok(result)
 }
 
@@ -142,7 +140,6 @@ pub fn current_mode(screen: Option<&str>) -> Result<String, Box<dyn std::error::
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
         }
     }?;
-    println!("{}", result);
     Ok(result)
 }
 
@@ -162,7 +159,6 @@ pub fn current_output() -> Result<String, Box<dyn std::error::Error>> {
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
         }
     }?;
-    println!("{}", result);
     Ok(result)
 }
 
@@ -185,7 +181,6 @@ pub fn current_resolution(screen: Option<&str>) -> Result<String, Box<dyn std::e
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
         }
     }?;
-    println!("{}", result);
     Ok(result)
 }
 
@@ -208,7 +203,6 @@ pub fn current_refresh(screen: Option<&str>) -> Result<String, Box<dyn std::erro
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
         }
     }?;
-    println!("{}", result);
     Ok(result)
 }
 
@@ -231,7 +225,6 @@ pub fn current_rotation(screen: Option<&str>) -> Result<String, Box<dyn std::err
             Ok("Unknown backend. Unable to determine display settings.\n".to_string())
         }
     }?;
-    println!("{}", result);
     Ok(result)
 }
 
@@ -402,6 +395,5 @@ pub fn min_to_max_resolution(screen: Option<&str>) -> Result<(), Box<dyn std::er
 /// or an error message if the operation fails.
 pub fn current_backend() -> Result<String, Box<dyn std::error::Error>> {
     let backend = detect_backend();
-    println!("{}", backend);
     Ok(backend.to_string())
 }

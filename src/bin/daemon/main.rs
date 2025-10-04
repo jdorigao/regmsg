@@ -27,8 +27,6 @@ fn main() {
 
         match msg {
             Ok(cmdline) => {
-                println!("Received: {}", cmdline);
-
                 // Découper la commande et ses arguments
                 let parts: Vec<&str> = cmdline.split_whitespace().collect();
                 let (cmd, args) = parts.split_first().unwrap_or((&"", &[]));
