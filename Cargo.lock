@@ -1130,7 +1130,6 @@ dependencies = [
  "serde_json",
  "simplelog",
  "swayipc",
- "zeromq-src 0.3.6+4.3.5",
  "zmq",
 ]
 
@@ -1830,16 +1829,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "zeromq-src"
-version = "0.3.6+4.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9a1c884770df9c1b3eb0a0ad01d7516234879e0ce144c505348550f2492923e"
-dependencies = [
- "cc",
- "dircpy",
-]
-
-[[package]]
 name = "zmq"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1858,7 +1847,7 @@ checksum = "8e8351dc72494b4d7f5652a681c33634063bbad58046c1689e75270908fdc864"
 dependencies = [
  "libc",
  "system-deps",
- "zeromq-src 0.2.6+4.3.4",
+ "zeromq-src",
 ]
 
 [[package]]
