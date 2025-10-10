@@ -4,6 +4,10 @@ use clap::{Parser, Subcommand};
 use simplelog::{CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode, WriteLogger};
 use std::fs::OpenOptions;
 
+use zeromq::prelude::*; // traits
+use zeromq::ReqSocket; // or DealerSocket, RouterSocket, etc.
+use zeromq::ZmqMessage;
+
 /// Arguments globaux de la CLI
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -75,19 +79,20 @@ fn init_logging(enable_terminal: bool) {
 }
 
 /// Point d’entrée
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[async_std::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     // Init logging
     init_logging(cli.log);
 
     // Connexion au démon via ZeroMQ
-    let ctx = zmq::Context::new();
-    let socket = ctx.socket(zmq::REQ)?;
-    socket.connect("ipc:///var/run/regmsgd.sock")?;
+    //let ctx = zmq::Context::new();
+    let mut socket = ReqSocket::new();
+    let _ = socket.connect("ipc:///var/run/regmsgd.sock").await;
 
     // Exécution de la commande
-    if let Err(e) = handle_command(&cli, &socket) {
+    if let Err(e) = handle_command(&cli, socket).await {
         eprintln!("Error: {e}");
         std::process::exit(1);
     }
@@ -96,7 +101,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Exécute la sous-commande sélectionnée
-fn handle_command(cli: &Cli, socket: &zmq::Socket) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_command(cli: &Cli, mut socket: zeromq::ReqSocket) -> Result<(), Box<dyn std::error::Error>> {
     let mut msg = String::new();
 
     // Construire la commande en fonction de l'enum
@@ -139,14 +144,25 @@ fn handle_command(cli: &Cli, socket: &zmq::Socket) -> Result<(), Box<dyn std::er
     }
 
     // Envoyer la commande au démon
-    socket.send(&msg, 0)?;
+    let _ = socket.send(ZmqMessage::from(msg.clone())).await;
 
     // Réception et affichage
-    let reply = socket.recv_string(0)?;
-    match reply {
-        Ok(text) => println!("{text}"),
+    let reply = socket.recv().await?;
+
+    // Get the first frame as a UTF-8 string
+    let reply_str = match reply.get(0) {
+        Some(frame) => String::from_utf8(frame.to_vec())?,
+        None => String::new(),
+    };
+
+    println!("{}", reply_str); // prints the raw string
+
+//let reply_str = String::from_utf8(reply[0].to_vec())?;
+
+    /*match reply {
+        Ok(text) => println!("{:?}", text),
         Err(bytes) => println!("Error in reply (non-UTF8): {:?}", bytes),
-    }
+    }*/
 
     Ok(())
 }

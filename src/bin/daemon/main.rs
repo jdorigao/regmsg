@@ -1,37 +1,48 @@
 #![cfg(feature = "daemon")]
 
-use zmq::{Context, REP};
 use std::fs;
+use zeromq::prelude::*; // traits
+use zeromq::{RepSocket, ZmqMessage};
 
 mod screen;
 
-fn main() {
+#[async_std::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let socket_path = "/var/run/regmsgd.sock";
 
     // Supprimer le socket existant si présent
     let _ = fs::remove_file(socket_path);
 
-    // Créer le contexte ZMQ
-    let context = Context::new();
-
     // Créer un socket REP (reply)
-    let socket = context.socket(REP).expect("Failed to create socket");
-    socket
-        .bind(&format!("ipc://{}", socket_path))
-        .expect("Failed to bind socket");
+    let mut socket = RepSocket::new();
+    socket.bind(&format!("ipc://{}", socket_path)).await?;
     println!("Daemon running on ipc://{} ...", socket_path);
 
     loop {
-        // Recevoir le message
-        let msg = socket.recv_string(0).expect("Failed to receive message");
+        let msg = socket.recv().await;
 
         match msg {
             Ok(cmdline) => {
-                // Découper la commande et ses arguments
-                let parts: Vec<&str> = cmdline.split_whitespace().collect();
+                // Convert first frame to String
+                let cmdline_str = match cmdline.get(0) {
+                    Some(frame) => match String::from_utf8(frame.to_vec()) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            eprintln!("Invalid UTF-8 message: {:?}", e);
+                            continue;
+                        }
+                    },
+                    None => {
+                        eprintln!("Received empty message");
+                        continue;
+                    }
+                };
+
+                // Split command and arguments
+                let parts: Vec<&str> = cmdline_str.split_whitespace().collect();
                 let (cmd, args) = parts.split_first().unwrap_or((&"", &[]));
 
-                // Exécuter la commande correspondante
+                // Execute command and send reply...
                 let result: Result<String, Box<dyn std::error::Error>> = match *cmd {
                     // Fonctions qui renvoient Result<String, Box<dyn Error>>
                     "listModes" => screen::list_modes(None),
@@ -65,7 +76,7 @@ fn main() {
                     // Commande inconnue
                     _ => Err(Box::<dyn std::error::Error>::from(format!(
                         "Unknown or invalid command: {}",
-                        cmdline
+                        cmdline_str
                     ))),
                 };
 
@@ -76,7 +87,9 @@ fn main() {
                 };
 
                 // Envoyer la réponse au client
-                socket.send(&reply, 0).expect("Failed to send reply");
+                if let Err(e) = socket.send(ZmqMessage::from(reply)).await {
+                    eprintln!("Failed to send reply: {:?}", e);
+                }
             }
             Err(e) => eprintln!("Error receiving message: {:?}", e),
         }
