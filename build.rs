@@ -3,10 +3,6 @@ use std::{env, fs, path::Path};
 /// Main function to orchestrate the build process for the drmhook library.
 /// This build script is used by Cargo to compile native C code and link the resulting library.
 fn main() {
-    if pkg_config::Config::new().probe("libzmq").is_err() {
-        panic!("System libzmq not found. Please install libzmq3-dev or zeromq-dev.");
-    }
-
     // Retrieve the output directory from the OUT_DIR environment variable set by Cargo.
     // This directory is where build artifacts are placed.
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR environment variable not set");
