@@ -2,12 +2,12 @@
 name = "regmsg"
 version = "0.0.4"
 edition = "2024"
-authors = ["Juliano Dorigão <jdorigao@gmail.com>"]
+authors = ["REG-Linux Team"]
 description = "Manages screen resolution and display settings"
 license = "MIT"
-repository = "https://github.com/jdorigao/regmsg"
-documentation = "https://github.com/jdorigao/regmsg#readme"
-homepage = "https://github.com/jdorigao"
+repository = "https://github.com/REG-Linux/regmsg"
+documentation = "https://github.com/REG-Linux/regmsg/blob/main/README.md"
+homepage = "https://reglinux.org/"
 readme = "README.md"
 keywords = ["display", "resolution", "drm", "sway", "wayland"]
 categories = ["command-line-utilities"]
