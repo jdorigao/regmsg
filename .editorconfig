@@ -1,29 +1,62 @@
-# EditorConfig helps developers define and maintain consistent
-# coding styles between different editors and IDEs
-# editorconfig.org
+# EditorConfig for a mixed Rust + C/C++ project
+# https://editorconfig.org
 
 root = true
 
+# --- Default settings ---
 [*]
-end_of_line = lf
 charset = utf-8
-trim_trailing_whitespace = true
+end_of_line = lf
 insert_final_newline = true
+trim_trailing_whitespace = true
 
-[!src/llvm-project]
+# --- Rust files ---
+[*.rs]
+indent_style = space
+indent_size = 4
+continuation_indent_size = 4
+max_line_length = 100
+# Note: rustfmt handles most formatting automatically
+
+# --- C / C++ source and headers ---
+[*.{c,cc,cpp,h,hh,hpp}]
+indent_style = tab
+tab_width = 8
+# Common convention in C projects is to use tabs with a width of 8
+# You can change tab_width to 4 if you prefer a tighter layout
+
+# --- Python scripts (build tools, utilities, etc.) ---
+[*.py]
 indent_style = space
 indent_size = 4
 
-[*.rs]
-max_line_length = 100
+# --- TOML configuration files (Cargo.toml, etc.) ---
+[*.toml]
+indent_style = space
+indent_size = 4
 
-[*.md]
-# double whitespace at end of line
-# denotes a line break in Markdown
-trim_trailing_whitespace = false
-
-[*.yml]
+# --- JSON and YAML files ---
+[*.{json,yml,yaml}]
+indent_style = space
 indent_size = 2
 
+# --- Shell scripts ---
+[*.sh]
+indent_style = space
+indent_size = 4
+
+# --- Makefiles ---
 [Makefile]
 indent_style = tab
+
+# --- Markdown and text documentation ---
+[*.{md,txt}]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = false
+# Keep trailing spaces for Markdown formatting
+
+# --- License and README files ---
+[LICENSE*]
+insert_final_newline = true
+trim_trailing_whitespace = false

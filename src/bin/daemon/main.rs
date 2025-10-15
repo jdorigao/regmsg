@@ -43,42 +43,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let (cmd, args) = parts.split_first().unwrap_or((&"", &[]));
 
                 // Execute command and send reply...
-                let result: Result<String, Box<dyn std::error::Error>> = match *cmd {
-                    // Fonctions qui renvoient Result<String, Box<dyn Error>>
-                    "listModes" => screen::list_modes(None),
-                    "listOutputs" => screen::list_outputs(),
-                    "currentMode" => screen::current_mode(None),
-                    "currentOutput" => screen::current_output(),
-                    "currentResolution" => screen::current_resolution(None),
-                    "currentRotation" => screen::current_rotation(None),
-                    "currentRefresh" => screen::current_refresh(None),
-                    "currentBackend" => screen::current_backend(),
+                let result: Result<String, Box<dyn std::error::Error>> =
+                    match *cmd {
+                        // Fonctions qui renvoient Result<String, Box<dyn Error>>
+                        "listModes" => screen::list_modes(None),
+                        "listOutputs" => screen::list_outputs(),
+                        "currentMode" => screen::current_mode(None),
+                        "currentOutput" => screen::current_output(),
+                        "currentResolution" => screen::current_resolution(None),
+                        "currentRotation" => screen::current_rotation(None),
+                        "currentRefresh" => screen::current_refresh(None),
+                        "currentBackend" => screen::current_backend(),
 
-                    // Fonctions qui renvoient Result<(), Box<dyn Error>>
-                    "getScreenshot" => screen::get_screenshot()
-                        .map(|_| "Screenshot taken".to_string()),
-                    "mapTouchScreen" => screen::map_touch_screen()
-                        .map(|_| "Touchscreen mapped".to_string()),
-                    "minTomaxResolution" => screen::min_to_max_resolution(None)
-                        .map(|_| "Resolution set to max".to_string()),
+                        // Fonctions qui renvoient Result<(), Box<dyn Error>>
+                        "getScreenshot" => {
+                            screen::get_screenshot().map(|_| "Screenshot taken".to_string())
+                        }
+                        "mapTouchScreen" => {
+                            screen::map_touch_screen().map(|_| "Touchscreen mapped".to_string())
+                        }
+                        "minTomaxResolution" => screen::min_to_max_resolution(None)
+                            .map(|_| "Resolution set to max".to_string()),
 
-                    // Commandes avec arguments
-                    "setMode" if args.len() == 1 => screen::set_mode(None, args[0])
-                        .map(|_| format!("Mode set to {}", args[0])),
-                    "setOutput" if args.len() == 1 => screen::set_output(args[0])
-                        .map(|_| format!("Output set to {}", args[0])),
-                    "setRotation" if args.len() == 1 => screen::set_rotation(None, args[0])
-                        .map(|_| format!("Rotation set to {}", args[0])),
+                        // Commandes avec arguments
+                        "setMode" if args.len() == 1 => screen::set_mode(None, args[0])
+                            .map(|_| format!("Mode set to {}", args[0])),
+                        "setOutput" if args.len() == 1 => screen::set_output(args[0])
+                            .map(|_| format!("Output set to {}", args[0])),
+                        "setRotation" if args.len() == 1 => screen::set_rotation(None, args[0])
+                            .map(|_| format!("Rotation set to {}", args[0])),
 
-                    // Commande vide
-                    "" => Err(Box::<dyn std::error::Error>::from("Empty command")),
+                        // Commande vide
+                        "" => Err(Box::<dyn std::error::Error>::from("Empty command")),
 
-                    // Commande inconnue
-                    _ => Err(Box::<dyn std::error::Error>::from(format!(
-                        "Unknown or invalid command: {}",
-                        cmdline_str
-                    ))),
-                };
+                        // Commande inconnue
+                        _ => Err(Box::<dyn std::error::Error>::from(format!(
+                            "Unknown or invalid command: {}",
+                            cmdline_str
+                        ))),
+                    };
 
                 // Convertir le résultat en chaîne pour l'envoyer
                 let reply = match result {

@@ -4,9 +4,9 @@ use clap::{Parser, Subcommand};
 use simplelog::{CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode, WriteLogger};
 use std::fs::OpenOptions;
 
-use zeromq::prelude::*; // traits
 use zeromq::ReqSocket; // or DealerSocket, RouterSocket, etc.
 use zeromq::ZmqMessage;
+use zeromq::prelude::*; // traits
 
 /// Arguments globaux de la CLI
 #[derive(Parser, Debug)]
@@ -41,8 +41,12 @@ enum Commands {
     CurrentRotation,
     CurrentRefresh,
     CurrentBackend,
-    SetMode { mode: String },
-    SetOutput { output: String },
+    SetMode {
+        mode: String,
+    },
+    SetOutput {
+        output: String,
+    },
     SetRotation {
         #[arg(value_parser = ["0", "90", "180", "270"])]
         rotation: String,
@@ -54,17 +58,15 @@ enum Commands {
 
 /// Configure le logging fichier + terminal
 fn init_logging(enable_terminal: bool) {
-    let mut loggers: Vec<Box<dyn simplelog::SharedLogger>> = vec![
-        WriteLogger::new(
-            LevelFilter::Debug,
-            Config::default(),
-            OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("/var/log/regmsg.log")
-                .expect("Impossible d'ouvrir /var/log/regmsg.log"),
-        ),
-    ];
+    let mut loggers: Vec<Box<dyn simplelog::SharedLogger>> = vec![WriteLogger::new(
+        LevelFilter::Debug,
+        Config::default(),
+        OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/var/log/regmsg.log")
+            .expect("Impossible d'ouvrir /var/log/regmsg.log"),
+    )];
 
     if enable_terminal {
         loggers.push(TermLogger::new(
@@ -101,7 +103,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Exécute la sous-commande sélectionnée
-async fn handle_command(cli: &Cli, mut socket: zeromq::ReqSocket) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_command(
+    cli: &Cli,
+    mut socket: zeromq::ReqSocket,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut msg = String::new();
 
     // Construire la commande en fonction de l'enum
@@ -157,7 +162,7 @@ async fn handle_command(cli: &Cli, mut socket: zeromq::ReqSocket) -> Result<(), 
 
     println!("{}", reply_str); // prints the raw string
 
-//let reply_str = String::from_utf8(reply[0].to_vec())?;
+    //let reply_str = String::from_utf8(reply[0].to_vec())?;
 
     /*match reply {
         Ok(text) => println!("{:?}", text),
