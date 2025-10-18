@@ -1,82 +1,109 @@
-use std::{env, fs, path::Path};
+use std::{env, fs, path::Path, process::Command};
 
-/// Main function to orchestrate the build process for the drmhook library.
-/// This build script is used by Cargo to compile native C code and link the resulting library.
+/// Build script for compiling the drmhook C library and linking it with the Rust project.
+///
+/// This script performs the following tasks:
+/// 1. Compiles `lib/drmhook.c` into a shared library `libdrmhook.so`
+/// 2. Handles libdrm dependency resolution via pkg-config
+/// 3. Copies the compiled library to the target directory for easy access
+/// 4. Sets up Cargo linking instructions
+///
+/// The build process uses the system C compiler and falls back to default paths
+/// if pkg-config is unavailable or libdrm is not found.
 fn main() {
-    // Retrieve the output directory from the OUT_DIR environment variable set by Cargo.
-    // This directory is where build artifacts are placed.
+    // Retrieve build environment variables set by Cargo
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR environment variable not set");
-
-    // Define the name of the shared library to be created.
-    // The library will be named "libdrmhook.so" and placed in the output directory.
+    let profile = env::var("PROFILE").expect("PROFILE environment variable not set");
     let lib_name = "libdrmhook.so";
     let out_lib = format!("{}/{}", out_dir, lib_name);
 
-    // Retrieve the build profile (e.g., debug or release) from the PROFILE environment variable.
-    let profile = env::var("PROFILE").expect("PROFILE environment variable not set");
+    // Verify that the C source file exists before attempting compilation
+    let source_file = "lib/drmhook.c";
+    if !Path::new(source_file).exists() {
+        panic!("Source file not found: {}", source_file);
+    }
 
-    // Initialize a new cc::Build instance to compile C code.
-    let mut build = cc::Build::new();
-
-    // Compile intermediate object files from the C source (if any).
-    let objects = build.compile_intermediates();
-
-    // Attempt to use pkg-config to locate libdrm and its include paths.
-    match pkg_config::Config::new()
-        .env_metadata(true) // Include environment metadata in the probe.
-        .cargo_metadata(false) // Disable Cargo metadata output.
-        .probe("libdrm") // Probe for the libdrm library.
-    {
-        Ok(lib) => {
-            // If libdrm is found, include its include paths in the build configuration.
-            for path in lib.include_paths {
-                build.include(path);
-            }
-        }
+    // Attempt to locate libdrm development files using pkg-config
+    // This provides proper include paths and compilation flags
+    let include_paths = match pkg_config::Config::new().probe("libdrm") {
+        Ok(lib) => lib.include_paths,
         Err(_) => {
-            // If pkg-config fails, fall back to a default include path.
-            eprintln!("⚠️ pkg-config failed, falling back to default include path");
-            build.include("/usr/include");
+            // Fallback to default system include path if pkg-config fails
+            vec!["/usr/include".into()]
+        }
+    };
+
+    // Configure the compiler command with necessary flags:
+    // - -shared: Create a shared library
+    // - -fPIC: Generate position-independent code (required for shared libraries)
+    // - -O2: Optimization level 2
+    // - -ldrm: Link against libdrm
+    // - -ldl: Link against libdl (dynamic loading library)
+    let mut cmd = Command::new("cc");
+    cmd.args([
+        "-shared",
+        "-fPIC",
+        "-O2",
+        source_file,
+        "-o",
+        &out_lib,
+        "-ldrm",
+        "-ldl",
+    ]);
+
+    // Add include paths discovered via pkg-config or fallback
+    for path in &include_paths {
+        cmd.arg("-I").arg(path);
+    }
+
+    // Execute the compilation command
+    let status = cmd.status().expect("Failed to execute compiler");
+
+    if !status.success() {
+        // If the first attempt fails, try a simpler approach without optimization
+        // This helps with compatibility on different systems
+        let status_simple = Command::new("cc")
+            .args([
+                "-shared",
+                "-fPIC",
+                source_file,
+                "-o",
+                &out_lib,
+                "-ldrm",
+                "-ldl",
+            ])
+            .status()
+            .expect("Failed to execute compiler (alternative approach)");
+
+        if !status_simple.success() {
+            panic!("Failed to compile libdrmhook.so - check compiler output for details");
         }
     }
 
-    // Configure the build to compile the drmhook.c file and generate a shared library.
-    // The compiler command is customized with flags for a position-independent code (-fPIC)
-    // and links against libdrm and libdl.
-    build
-        .get_compiler()
-        .to_command()
-        .args([
-            "-shared",
-            "-fPIC",
-            "lib/drmhook.c",
-            "-o",
-            &out_lib,
-            "-ldrm",
-            "-ldl",
-        ])
-        .args(&objects)
-        .status()
-        .expect("Failed to execute compiler command");
+    // Verify that the shared library was successfully created
+    if Path::new(&out_lib).exists() {
+        // Copy the library to the target directory for easier access during development
+        let target_lib = format!("target/{}/{}", profile, lib_name);
+        fs::create_dir_all(format!("target/{}", profile))
+            .expect("Failed to create target directory");
 
-    // Construct the path to the compiled library in the output directory.
-    let lib_path = Path::new(&out_dir).join(lib_name);
+        fs::copy(&out_lib, &target_lib).expect("Failed to copy library to target directory");
+    } else {
+        panic!("Library was not created at expected location: {}", out_lib);
+    }
 
-    // Construct the path where the library will be copied for easier access.
-    let final_copy_path = format!("target/{}/{}", profile, lib_name);
-
-    // Create the target/profile directory if it doesn't exist.
-    fs::create_dir_all(format!("target/{}", profile)).expect("Failed to create target directory");
-
-    // Copy the compiled library to the target/profile directory for debugging or manual access.
-    fs::copy(&lib_path, &final_copy_path).expect("Failed to copy library to target directory");
-
-    // Instruct Cargo to link against the compiled library by specifying the search path.
+    // Tell Cargo where to find the compiled library
     println!("cargo:rustc-link-search=native={}", out_dir);
 
-    // Instruct Cargo to link the drmhook library as a dynamic library.
+    // Tell Cargo to link against the drmhook library as a dynamic library
     println!("cargo:rustc-link-lib=dylib=drmhook");
 
-    // Inform Cargo para reexecutar o script de build se o arquivo drmhook.c for alterado.
+    // Re-run this build script if the C source file changes
     println!("cargo:rerun-if-changed=lib/drmhook.c");
+
+    // Re-run if pkg-config environment changes (could affect library discovery)
+    println!("cargo:rerun-if-env-changed=PKG_CONFIG_PATH");
+
+    // Re-run if Cargo build profile changes (debug/release)
+    println!("cargo:rerun-if-env-changed=PROFILE");
 }
