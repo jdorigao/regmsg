@@ -3,12 +3,10 @@ name = "regmsg"
 version = "0.0.4"
 edition = "2024"
 authors = ["REG-Linux Team"]
-description = "Manages screen resolution and display settings"
+description = "Multi-purpose system manager for REG Linux"
 license = "MIT"
 repository = "https://github.com/REG-Linux/regmsg"
-documentation = "https://github.com/REG-Linux/regmsg/blob/main/README.md"
 homepage = "https://reglinux.org/"
-readme = "README.md"
 keywords = ["display", "resolution", "drm", "sway", "wayland"]
 categories = ["command-line-utilities"]
 
@@ -37,6 +35,7 @@ version = "0.25"
 optional = true
 
 [features]
+default = ["cli", "daemon"]
 cli = []
 daemon = ["drm", "swayipc", "image"]
 
