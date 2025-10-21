@@ -10,12 +10,8 @@ use zeromq::prelude::*; // traits
 #[command(author, version, about)]
 struct Cli {
     /// Target screen identifier (optional)
-    #[arg(short, long)]
+    #[arg(short = 's', long)]
     screen: Option<String>,
-
-    /// Enable terminal logging
-    #[arg(short, long)]
-    log: bool,
 
     /// Subcommand to execute
     #[command(subcommand)]
@@ -30,26 +26,39 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 #[command(rename_all = "camelCase")] // <--- all variants become camelCase
 enum Commands {
+    #[command(about = "Lists all available outputs (e.g., HDMI, VGA).")]
     ListModes,
+
+    #[command(about = "List all available display outputs")]
     ListOutputs,
+    #[command(about = "Displays the current display mode for the specified screen.")]
     CurrentMode,
+    #[command(about = "Displays the current output (e.g., HDMI, VGA).")]
     CurrentOutput,
+    #[command(about = "Displays the current resolution for the specified screen.")]
     CurrentResolution,
+    #[command(about = "Displays the current screen rotation for the specified screen.")]
     CurrentRotation,
+    #[command(about = "Displays the current refresh rate for the specified screen.")]
     CurrentRefresh,
+    #[command(about = "Displays the current window system.")]
     CurrentBackend,
-    SetMode {
-        mode: String,
-    },
-    SetOutput {
-        output: String,
-    },
+    #[command(about = "Sets the display mode for the specified screen.")]
+    SetMode { mode: String },
+    #[command(about = "Sets the output resolution and refresh rate (e.g., WxH@R or WxH).")]
+    SetOutput { output: String },
+    #[command(about = "Sets the screen rotation for the specified screen.")]
     SetRotation {
         #[arg(value_parser = ["0", "90", "180", "270"])]
         rotation: String,
     },
+    #[command(about = "Takes a screenshot of the current screen.")]
     GetScreenshot,
+    #[command(about = "Maps the touchscreen to the correct display.")]
     MapTouchScreen,
+    #[command(
+        about = "Sets the screen resolution to the maximum supported resolution (e.g., 1920x1080)."
+    )]
     MinToMaxResolution,
 }
 
