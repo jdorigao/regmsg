@@ -6,6 +6,7 @@ use std::fs;
 use std::time::Duration;
 use zeromq::prelude::*;
 use zeromq::{RepSocket, ZmqMessage};
+use log::{debug, error, info, warn};
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -35,7 +36,10 @@ impl DaemonServer {
         let mut socket = RepSocket::new();
 
         // Use blocking operation for bind to ensure it completes
-        async_std::task::block_on(async { socket.bind(&format!("ipc://{}", SOCKET_PATH)).await })?;
+        async_std::task::block_on(async { 
+            info!("Binding socket to ipc://{}", SOCKET_PATH);
+            socket.bind(&format!("ipc://{}", SOCKET_PATH)).await 
+        })?;
 
         // Set appropriate permissions for the socket (Unix only)
         #[cfg(unix)]
@@ -43,11 +47,15 @@ impl DaemonServer {
             if let Ok(metadata) = fs::metadata(SOCKET_PATH) {
                 let mut perms = metadata.permissions();
                 perms.set_mode(0o660); // rw-rw----
-                let _ = fs::set_permissions(SOCKET_PATH, perms);
+                if let Err(e) = fs::set_permissions(SOCKET_PATH, perms) {
+                    warn!("Failed to set socket permissions: {}", e);
+                } else {
+                    info!("Socket permissions set to 0o660");
+                }
             }
         }
 
-        log::info!("Daemon running on ipc://{}", SOCKET_PATH);
+        info!("Daemon server initialized on ipc://{}", SOCKET_PATH);
 
         Ok(DaemonServer { socket })
     }
@@ -57,8 +65,12 @@ impl DaemonServer {
     /// # Returns
     /// * `Result<(), Box<dyn std::error::Error>>` - Ok if shutdown succeeds, or an error
     pub async fn shutdown(self) -> Result<(), Box<dyn std::error::Error>> {
-        log::info!("Shutting down daemon server");
-        let _ = fs::remove_file(SOCKET_PATH);
+        info!("Initiating graceful shutdown of daemon server");
+        if let Err(e) = fs::remove_file(SOCKET_PATH) {
+            warn!("Failed to remove socket file {}: {}", SOCKET_PATH, e);
+        } else {
+            info!("Socket file {} removed successfully", SOCKET_PATH);
+        }
         Ok(())
     }
 
@@ -101,12 +113,15 @@ impl DaemonServer {
         min_to_max_resolution: command_handler::MinToMaxResolutionFn,
         shutdown_rx: Receiver<()>,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        info!("Starting daemon server loop");
+        
         loop {
             // Use select to handle both messages and shutdown signal
             futures::select! {
                 msg = self.socket.recv().fuse() => {
                     match msg {
                         Ok(cmdline) => {
+                            debug!("Received message from client");
                             if let Err(e) = self.process_message(
                                 cmdline,
                                 list_modes,
@@ -124,20 +139,22 @@ impl DaemonServer {
                                 map_touch_screen,
                                 min_to_max_resolution,
                             ).await {
-                                log::error!("Error processing message: {:?}", e);
+                                error!("Error processing message: {:?}", e);
                             }
                         }
                         Err(e) => {
-                            log::error!("Error receiving message: {:?}", e);
+                            error!("Error receiving message: {:?}", e);
                         }
                     }
                 }
                 _ = shutdown_rx.recv().fuse() => {
-                    log::info!("Shutdown signal received, stopping server loop");
+                    info!("Shutdown signal received, stopping server loop");
                     break;
                 }
             }
         }
+        
+        info!("Daemon server loop stopped");
         Ok(())
     }
 
@@ -169,8 +186,12 @@ impl DaemonServer {
     ) -> Result<(), Box<dyn std::error::Error>> {
         // Extract and validate command string
         let cmdline_str = match self.extract_command(&cmdline) {
-            Ok(s) => s,
+            Ok(s) => {
+                info!("Received command: '{}'", s);
+                s
+            },
             Err(e) => {
+                warn!("Invalid command received: {}", e);
                 let error_msg = format!("Error: {}", e);
                 self.send_reply(error_msg).await?;
                 return Ok(());
@@ -198,6 +219,7 @@ impl DaemonServer {
 
         // Format and send the response
         let reply = response_handler::format_response(result);
+        debug!("Sending reply: '{}'", reply);
         self.send_reply(reply).await
     }
 
@@ -211,10 +233,13 @@ impl DaemonServer {
     fn extract_command(&self, cmdline: &ZmqMessage) -> Result<String, String> {
         let frame = cmdline
             .get(0)
-            .ok_or_else(|| "Received empty message".to_string())?;
+            .ok_or_else(|| {
+                warn!("Received empty message");
+                "Received empty message".to_string()
+            })?;
 
         if frame.len() > MAX_MESSAGE_SIZE {
-            log::warn!("Message too large: {} bytes", frame.len());
+            warn!("Message too large: {} bytes", frame.len());
             return Err(format!(
                 "Message too large: {} bytes (max: {})",
                 frame.len(),
@@ -222,7 +247,16 @@ impl DaemonServer {
             ));
         }
 
-        String::from_utf8(frame.to_vec()).map_err(|e| format!("Invalid UTF-8 message: {}", e))
+        match String::from_utf8(frame.to_vec()) {
+            Ok(s) => {
+                debug!("Successfully extracted command string: '{}'", s);
+                Ok(s)
+            },
+            Err(e) => {
+                warn!("Invalid UTF-8 message: {}", e);
+                Err(format!("Invalid UTF-8 message: {}", e))
+            }
+        }
     }
 
     /// Send a reply to the client with retry logic
@@ -233,20 +267,24 @@ impl DaemonServer {
     /// # Returns
     /// * `Result<(), Box<dyn std::error::Error>>` - Ok if send succeeds, or an error
     async fn send_reply(&mut self, reply: String) -> Result<(), Box<dyn std::error::Error>> {
+        debug!("Attempting to send reply: '{}'", reply);
+        
         for attempt in 0..MAX_SEND_RETRIES {
             match self.socket.send(ZmqMessage::from(reply.clone())).await {
                 Ok(_) => {
                     if attempt > 0 {
-                        log::info!("Reply sent successfully on attempt {}", attempt + 1);
+                        info!("Reply sent successfully on attempt {}", attempt + 1);
+                    } else {
+                        debug!("Reply sent successfully on first attempt");
                     }
                     return Ok(());
                 }
                 Err(e) if attempt < MAX_SEND_RETRIES - 1 => {
-                    log::warn!("Failed to send reply (attempt {}): {:?}", attempt + 1, e);
+                    warn!("Failed to send reply (attempt {}): {:?}", attempt + 1, e);
                     async_std::task::sleep(Duration::from_millis(100 * (attempt as u64 + 1))).await;
                 }
                 Err(e) => {
-                    log::error!(
+                    error!(
                         "Failed to send reply after {} attempts: {:?}",
                         MAX_SEND_RETRIES,
                         e

@@ -1,4 +1,5 @@
 use std::fmt;
+use log::{debug, info, warn};
 
 /// Result type for command execution
 pub type CommandResult = Result<String, CommandError>;
@@ -108,58 +109,104 @@ pub fn handle_command(
     map_touch_screen: MapTouchScreenFn,
     min_to_max_resolution: MinToMaxResolutionFn,
 ) -> CommandResult {
+    debug!("Handling command: '{}'", cmdline);
+    
     // Split command and arguments
     let parts: Vec<&str> = cmdline.split_whitespace().collect();
     let (cmd, args) = parts.split_first().unwrap_or((&"", &[]));
 
     match *cmd {
         // Functions that return Result<String, Box<dyn Error>>
-        "listModes" => execute_command_with_result(|| list_modes(None)),
-        "listOutputs" => execute_command_with_result(|| list_outputs()),
-        "currentMode" => execute_command_with_result(|| current_mode(None)),
-        "currentOutput" => execute_command_with_result(|| current_output()),
-        "currentResolution" => execute_command_with_result(|| current_resolution(None)),
-        "currentRotation" => execute_command_with_result(|| current_rotation(None)),
-        "currentRefresh" => execute_command_with_result(|| current_refresh(None)),
-        "currentBackend" => execute_command_with_result(|| current_backend()),
+        "listModes" => {
+            info!("Executing listModes command");
+            execute_command_with_result(|| list_modes(None))
+        },
+        "listOutputs" => {
+            info!("Executing listOutputs command");
+            execute_command_with_result(|| list_outputs())
+        },
+        "currentMode" => {
+            info!("Executing currentMode command");
+            execute_command_with_result(|| current_mode(None))
+        },
+        "currentOutput" => {
+            info!("Executing currentOutput command");
+            execute_command_with_result(|| current_output())
+        },
+        "currentResolution" => {
+            info!("Executing currentResolution command");
+            execute_command_with_result(|| current_resolution(None))
+        },
+        "currentRotation" => {
+            info!("Executing currentRotation command");
+            execute_command_with_result(|| current_rotation(None))
+        },
+        "currentRefresh" => {
+            info!("Executing currentRefresh command");
+            execute_command_with_result(|| current_refresh(None))
+        },
+        "currentBackend" => {
+            info!("Executing currentBackend command");
+            execute_command_with_result(|| current_backend())
+        },
 
         // Functions that return Result<(), Box<dyn Error>>
         "getScreenshot" => {
+            info!("Executing getScreenshot command");
             execute_command_with_unit_result(|| get_screenshot(), "Screenshot taken")
         }
         "mapTouchScreen" => {
+            info!("Executing mapTouchScreen command");
             execute_command_with_unit_result(|| map_touch_screen(), "Touchscreen mapped")
         }
-        "minTomaxResolution" => execute_command_with_unit_result(
-            || min_to_max_resolution(None),
-            "Resolution set to max",
-        ),
+        "minTomaxResolution" => {
+            info!("Executing minTomaxResolution command");
+            execute_command_with_unit_result(
+                || min_to_max_resolution(None),
+                "Resolution set to max",
+            )
+        },
 
         // Commands with arguments
-        "setMode" if args.len() == 1 => execute_command_with_arg_result(
-            |arg| set_mode(None, arg),
-            args[0],
-            "Mode set to {}",
-            "setMode",
-        ),
-        "setOutput" if args.len() == 1 => execute_command_with_arg_result(
-            |arg| set_output(arg),
-            args[0],
-            "Output set to {}",
-            "setOutput",
-        ),
-        "setRotation" if args.len() == 1 => execute_command_with_arg_result(
-            |arg| set_rotation(None, arg),
-            args[0],
-            "Rotation set to {}",
-            "setRotation",
-        ),
+        "setMode" if args.len() == 1 => {
+            info!("Executing setMode command with argument: '{}'", args[0]);
+            execute_command_with_arg_result(
+                |arg| set_mode(None, arg),
+                args[0],
+                "Mode set to {}",
+                "setMode",
+            )
+        },
+        "setOutput" if args.len() == 1 => {
+            info!("Executing setOutput command with argument: '{}'", args[0]);
+            execute_command_with_arg_result(
+                |arg| set_output(arg),
+                args[0],
+                "Output set to {}",
+                "setOutput",
+            )
+        },
+        "setRotation" if args.len() == 1 => {
+            info!("Executing setRotation command with argument: '{}'", args[0]);
+            execute_command_with_arg_result(
+                |arg| set_rotation(None, arg),
+                args[0],
+                "Rotation set to {}",
+                "setRotation",
+            )
+        },
 
         // Empty command
-        "" => Err(CommandError::EmptyCommand),
+        "" => {
+            warn!("Received empty command");
+            Err(CommandError::EmptyCommand)
+        },
 
         // Unknown command
-        _ => Err(CommandError::UnknownCommand(cmdline.to_string())),
+        _ => {
+            warn!("Unknown command received: '{}'", cmdline);
+            Err(CommandError::UnknownCommand(cmdline.to_string()))
+        },
     }
 }
 
