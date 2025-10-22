@@ -1,11 +1,7 @@
 #![cfg(feature = "daemon")]
 
-mod server {
-    pub mod command_handler;
-    pub mod response_handler;
-    pub mod server;
-}
 mod screen;
+mod server;
 
 use async_std::channel::{Sender, bounded};
 use async_std::stream::StreamExt;
