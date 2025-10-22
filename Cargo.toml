@@ -17,7 +17,6 @@ signal-hook = "0.3"
 signal-hook-async-std = "0.3"
 futures = "0.3"
 chrono = "0.4"
-serde_json = "1.0"
 
 [dependencies.async-std]
 version = "1.13"
@@ -40,14 +39,10 @@ optional = true
 version = "3.0"
 optional = true
 
-[dependencies.image]
-version = "0.25"
-optional = true
-
 [features]
 default = ["cli", "daemon"]
 cli = []
-daemon = ["drm", "swayipc", "image"]
+daemon = ["drm", "swayipc"]
 
 [build-dependencies]
 cc = "1.2"
