@@ -1,6 +1,7 @@
 #![cfg(feature = "cli")]
 
 use clap::{Parser, Subcommand};
+use log::{debug, error};
 use zeromq::ReqSocket; // or DealerSocket, RouterSocket, etc.
 use zeromq::ZmqMessage;
 use zeromq::prelude::*; // traits
@@ -65,6 +66,9 @@ enum Commands {
 /// Entry point
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize logger with flexible configuration via environment variables
+    env_logger::init();
+
     let cli = Cli::parse();
 
     // Connect to the daemon via ZeroMQ
@@ -73,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Execute the command
     if let Err(e) = handle_command(&cli, socket).await {
-        eprintln!("Error: {e}");
+        error!("Error: {e}");
         std::process::exit(1);
     }
 
@@ -138,7 +142,7 @@ async fn handle_command(
         None => String::new(),
     };
 
-    println!("{}", reply_str); // prints the raw string
+    debug!("{}", reply_str); // prints the raw string
 
     Ok(())
 }
