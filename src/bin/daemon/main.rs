@@ -1,5 +1,6 @@
 #![cfg(feature = "daemon")]
 
+mod controller;
 /// Screen management module providing display configuration functions
 mod screen;
 /// Server module containing ZeroMQ communication and command handling
@@ -13,11 +14,11 @@ use signal_hook::consts::signal::*;
 use signal_hook_async_std::Signals;
 
 /// Main entry point for the regmsg daemon
-/// 
+///
 /// This function initializes the daemon server, sets up signal handling for graceful shutdown,
 /// and runs the main server loop. It handles SIGTERM and SIGINT signals to allow for proper
 /// cleanup when the daemon is stopped.
-/// 
+///
 /// # Returns
 /// * `Result<(), Box<dyn std::error::Error>>` - Ok if the daemon runs and shuts down successfully, or an error
 #[async_std::main]
@@ -50,11 +51,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Asynchronous function to handle system signals for graceful shutdown
-/// 
+///
 /// This function listens for SIGTERM and SIGINT signals and sends a shutdown signal
 /// through the provided channel when either is received, allowing the main server
 /// loop to terminate gracefully.
-/// 
+///
 /// # Arguments
 /// * `signals` - The Signals struct that listens for system signals
 /// * `shutdown_tx` - The sender channel to signal shutdown

@@ -61,6 +61,10 @@ enum Commands {
         about = "Sets the screen resolution to the maximum supported resolution (e.g., 1920x1080)."
     )]
     MinToMaxResolution,
+    #[command(about = "Test ControllerDB.")]
+    ControllerDB,
+    #[command(about = "Adds a new controller to the database.")]
+    AddController { controller_id: String },
 }
 
 /// Entry point
@@ -116,6 +120,11 @@ async fn handle_command(
         Commands::GetScreenshot => msg.push_str("getScreenshot"),
         Commands::MapTouchScreen => msg.push_str("mapTouchScreen"),
         Commands::MinToMaxResolution => msg.push_str("minToMaxResolution"),
+        Commands::ControllerDB => msg.push_str("controllerDB"),
+        Commands::AddController { controller_id } => {
+            msg.push_str("addController ");
+            msg.push_str(&controller_id);
+        }
     }
 
     // Add --screen if specified

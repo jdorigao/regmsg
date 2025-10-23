@@ -5,6 +5,7 @@
 //! providing a clean interface between the ZeroMQ server and screen management functions.
 
 use super::command_registry::{CommandRegistry, screen_command, screen_setter_command};
+use crate::controller;
 use crate::screen;
 use crate::simple_command;
 
@@ -159,6 +160,27 @@ pub fn init_commands() -> CommandRegistry {
                 screen::set_rotation(screen, rotation)
             },
         ),
+    );
+
+    registry.register(
+        "addController",
+        Box::new(super::command_registry::ArgCommand {
+            name: "addController".to_string(),
+            description: "Adds a new controller to the system".to_string(),
+            expected_args: 1,
+            executor: Box::new(|args| controller::add_guids_to_sdl_db(vec![args[0].to_string()])),
+        }),
+    );
+
+    registry.register(
+        "controllerDB",
+        simple_command!("controllerDB", "List all available controllers", || {
+            let db = controller::get_sdl_db()?;
+            let db_lock = db
+                .lock()
+                .map_err(|e| -> Box<dyn std::error::Error> { format!("Failed to lock controller DB: {}", e).into() })?;
+            Ok(format!("{:?}", *db_lock))
+        }),
     );
 
     registry
