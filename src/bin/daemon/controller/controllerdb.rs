@@ -2,6 +2,7 @@ use log::debug;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, BufRead, BufReader};
+use std::sync::OnceLock;
 
 pub type Guid = String;
 
@@ -10,7 +11,9 @@ pub struct ControllerMapping {
     pub mapping_data: String,
 }
 
-pub fn load_gamecontroller_db() -> io::Result<HashMap<Guid, ControllerMapping>> {
+static CONTROLLER_DB: OnceLock<HashMap<Guid, ControllerMapping>> = OnceLock::new();
+
+fn load_gamecontroller_db() -> io::Result<HashMap<Guid, ControllerMapping>> {
     let paths = [
         "/userdata/system/configs/emulationstation/gamecontrollerdb.txt",
         "/usr/share/emulationstation/gamecontrollerdb.txt",
@@ -55,4 +58,33 @@ pub fn load_gamecontroller_db() -> io::Result<HashMap<Guid, ControllerMapping>> 
         io::ErrorKind::NotFound,
         format!("None of the specified paths could be opened: {:?}", paths),
     ))
+}
+
+pub fn get_controller_db()
+-> Result<&'static HashMap<Guid, ControllerMapping>, Box<dyn std::error::Error>> {
+    CONTROLLER_DB.get().ok_or_else(|| {
+        Box::<dyn std::error::Error>::from(io::Error::new(
+            io::ErrorKind::NotFound,
+            "Controller database not loaded",
+        ))
+    })
+}
+
+pub fn init_controller_db() -> io::Result<()> {
+    // Check if the controller database is already initialized
+    if CONTROLLER_DB.get().is_some() {
+        debug!("Controller database already initialized");
+        // If already initialized, return early without error
+        return Ok(());
+    }
+
+    debug!("Initializing controller database");
+    let db = load_gamecontroller_db()?;
+    CONTROLLER_DB.set(db).map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "Controller database already initialized",
+        )
+    })?;
+    Ok(())
 }
