@@ -1,7 +1,7 @@
 #![cfg(feature = "cli")]
 
 use clap::{Parser, Subcommand};
-use log::{debug, error};
+use log::error;
 use zeromq::ReqSocket; // or DealerSocket, RouterSocket, etc.
 use zeromq::ZmqMessage;
 use zeromq::prelude::*; // traits
@@ -142,7 +142,7 @@ async fn handle_command(
         None => String::new(),
     };
 
-    debug!("{}", reply_str); // prints the raw string
+    println!("{}", reply_str); // print the result to stdout
 
     Ok(())
 }
