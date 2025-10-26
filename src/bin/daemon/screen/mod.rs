@@ -1,5 +1,5 @@
 use log::{debug, error, info};
-use std::env;
+use std::path::Path;
 
 // Modules for backend-specific implementations
 mod kmsdrm;
@@ -24,7 +24,7 @@ struct ModeInfo {
 /// # Returns
 /// A static string indicating the detected backend: "Wayland" or "KMS/DRM".
 fn detect_backend() -> &'static str {
-    if env::var("WAYLAND_DISPLAY").is_ok() {
+    if Path::new("/var/run/sway-ipc.0.sock").exists() {
         info!("Detected Wayland backend.");
         return "Wayland";
     } else {
