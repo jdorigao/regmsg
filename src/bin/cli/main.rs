@@ -1,7 +1,7 @@
 #![cfg(feature = "cli")]
 
 use clap::{Parser, Subcommand};
-use log::error;
+use tracing::{error, info, debug};
 use zeromq::ReqSocket; // or DealerSocket, RouterSocket, etc.
 use zeromq::ZmqMessage;
 use zeromq::prelude::*; // traits
@@ -66,21 +66,31 @@ enum Commands {
 /// Entry point
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logger with flexible configuration via environment variables
-    env_logger::init();
+    // Initialize tracing with console output only for CLI
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
 
     let cli = Cli::parse();
+    debug!("Parsed CLI arguments: {:?}", cli);
 
     // Connect to the daemon via ZeroMQ
     let mut socket = ReqSocket::new();
-    let _ = socket.connect("ipc:///var/run/regmsgd.sock").await;
+    match socket.connect("ipc:///var/run/regmsgd.sock").await {
+        Ok(_) => debug!("Successfully connected to regmsg daemon"),
+        Err(e) => {
+            error!("Failed to connect to daemon: {e}");
+            return Err(Box::new(e));
+        }
+    }
 
     // Execute the command
     if let Err(e) = handle_command(&cli, socket).await {
-        error!("Error: {e}");
+        error!("Error executing command: {e}");
         std::process::exit(1);
     }
 
+    info!("Command executed successfully");
     Ok(())
 }
 
@@ -93,54 +103,110 @@ async fn handle_command(
 
     // Build the command based on the enum
     match &cli.command {
-        Commands::ListModes => msg.push_str("listModes"),
-        Commands::ListOutputs => msg.push_str("listOutputs"),
-        Commands::CurrentMode => msg.push_str("currentMode"),
-        Commands::CurrentOutput => msg.push_str("currentOutput"),
-        Commands::CurrentResolution => msg.push_str("currentResolution"),
-        Commands::CurrentRotation => msg.push_str("currentRotation"),
-        Commands::CurrentRefresh => msg.push_str("currentRefresh"),
-        Commands::CurrentBackend => msg.push_str("currentBackend"),
+        Commands::ListModes => {
+            msg.push_str("listModes");
+            info!("Listing available display modes");
+        },
+        Commands::ListOutputs => {
+            msg.push_str("listOutputs");
+            info!("Listing available display outputs");
+        },
+        Commands::CurrentMode => {
+            msg.push_str("currentMode");
+            info!("Getting current display mode");
+        },
+        Commands::CurrentOutput => {
+            msg.push_str("currentOutput");
+            info!("Getting current display output");
+        },
+        Commands::CurrentResolution => {
+            msg.push_str("currentResolution");
+            info!("Getting current display resolution");
+        },
+        Commands::CurrentRotation => {
+            msg.push_str("currentRotation");
+            info!("Getting current screen rotation");
+        },
+        Commands::CurrentRefresh => {
+            msg.push_str("currentRefresh");
+            info!("Getting current refresh rate");
+        },
+        Commands::CurrentBackend => {
+            msg.push_str("currentBackend");
+            info!("Getting current window backend");
+        },
         Commands::SetMode { mode } => {
             msg.push_str("setMode ");
             msg.push_str(mode);
-        }
+            info!("Setting display mode to: {}", mode);
+        },
         Commands::SetOutput { output } => {
             msg.push_str("setOutput ");
             msg.push_str(output);
-        }
+            info!("Setting output to: {}", output);
+        },
         Commands::SetRotation { rotation } => {
             msg.push_str("setRotation ");
             msg.push_str(rotation);
-        }
-        Commands::GetScreenshot => msg.push_str("getScreenshot"),
-        Commands::MapTouchScreen => msg.push_str("mapTouchScreen"),
-        Commands::MinToMaxResolution => msg.push_str("minToMaxResolution"),
+            info!("Setting screen rotation to: {} degrees", rotation);
+        },
+        Commands::GetScreenshot => {
+            msg.push_str("getScreenshot");
+            info!("Taking screenshot");
+        },
+        Commands::MapTouchScreen => {
+            msg.push_str("mapTouchScreen");
+            info!("Mapping touchscreen to display");
+        },
+        Commands::MinToMaxResolution => {
+            msg.push_str("minToMaxResolution");
+            info!("Setting resolution to maximum supported");
+        },
     }
 
     // Add --screen if specified
     if let Some(screen) = &cli.screen {
         msg.push_str(" --screen ");
         msg.push_str(screen);
+        debug!("Using screen: {}", screen);
     }
 
     // Add additional arguments
     if !cli.args.is_empty() {
         msg.push(' ');
         msg.push_str(&cli.args.join(" "));
+        debug!("Additional arguments: {:?}", cli.args);
     }
 
+    debug!("Sending command to daemon: {}", msg);
+
     // Send command to the daemon
-    let _ = socket.send(ZmqMessage::from(msg.clone())).await;
+    match socket.send(ZmqMessage::from(msg.clone())).await {
+        Ok(_) => debug!("Command sent successfully"),
+        Err(e) => error!("Failed to send command: {}", e),
+    }
 
     // Receive and display response
+    debug!("Waiting for response from daemon...");
     let reply = socket.recv().await?;
+    debug!("Received response from daemon");
 
     // Get the first frame as a UTF-8 string
     let reply_str = match reply.get(0) {
         Some(frame) => String::from_utf8(frame.to_vec())?,
         None => String::new(),
     };
+
+    if !reply_str.is_empty() {
+        // Log non-empty responses at info level, empty at debug level
+        if reply_str.trim().is_empty() {
+            debug!("Received empty response from daemon");
+        } else {
+            info!("Daemon response: {}", reply_str.trim());
+        }
+    } else {
+        debug!("Received empty response from daemon");
+    }
 
     println!("{}", reply_str); // print the result to stdout
 
