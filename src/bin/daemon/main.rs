@@ -2,8 +2,8 @@
 
 /// Configuration module for centralized settings
 mod config;
-/// Error handling module with unified error types
-mod error;
+/// Utilities module containing shared functionality like error handling
+mod utils;
 /// Screen management module providing display configuration functions
 mod screen;
 /// Server module containing ZeroMQ communication and command handling

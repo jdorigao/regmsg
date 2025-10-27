@@ -3,7 +3,7 @@ use log::{debug, error, info};
 // Import our new architecture modules
 use crate::screen::backend::{BackendManager, DisplayBackend, ModeParams};
 use crate::config;
-use crate::error::{RegmsgError, Result};
+use crate::utils::error::{RegmsgError, Result};
 
 // Modules for backend-specific implementations
 pub mod backend;

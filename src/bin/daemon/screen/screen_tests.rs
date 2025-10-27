@@ -4,7 +4,7 @@
 use crate::screen::backend::{DisplayBackend, DisplayMode, DisplayOutput, ModeParams, RotationParams, BackendManager};
 use crate::screen::kmsdrm::DrmBackend;
 use crate::screen::wayland::WaylandBackend;
-use crate::error::RegmsgError;
+use crate::utils::error::RegmsgError;
 
 // Test for DisplayMode serialization and deserialization
 #[test]

@@ -3,7 +3,7 @@
 //! This module defines traits and implementations for different display backends
 //! (Wayland, DRM/KMS, etc.), enabling a more modular and extensible architecture.
 
-use crate::error::Result;
+use crate::utils::error::Result;
 use serde::{Deserialize, Serialize};
 
 /// Structure that represents display mode information

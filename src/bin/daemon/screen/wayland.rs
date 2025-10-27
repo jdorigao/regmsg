@@ -6,7 +6,7 @@ use std::process::Command;
 use swayipc::{Connection, Output};
 
 use crate::screen::backend::{DisplayBackend, DisplayMode, DisplayOutput, ModeParams, RotationParams};
-use crate::error::{RegmsgError, Result};
+use crate::utils::error::{RegmsgError, Result};
 
 /// Pre-processes a vector of outputs into a HashMap for efficient lookup by name.
 fn preprocess_outputs(outputs: Vec<Output>) -> HashMap<String, Output> {

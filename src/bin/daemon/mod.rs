@@ -1,3 +1,4 @@
 pub mod config;
-pub mod error;
 pub mod screen;
+pub mod server;
+pub mod utils;

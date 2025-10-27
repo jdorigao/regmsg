@@ -7,7 +7,7 @@ use drm::control::{Device as ControlDevice, connector};
 use drm::Device;
 
 use crate::screen::backend::{DisplayBackend, DisplayMode, DisplayOutput, ModeParams, RotationParams};
-use crate::error::{RegmsgError, Result};
+use crate::utils::error::{RegmsgError, Result};
 
 const DRM_MODE_PATH: &str = "/var/run/drmMode";
 
