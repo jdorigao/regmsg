@@ -366,6 +366,6 @@ impl DisplayBackend for DrmBackend {
     }
 
     fn backend_name(&self) -> &'static str {
-        "DRM"
+        "KMS/DRM"
     }
 }

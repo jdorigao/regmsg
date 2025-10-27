@@ -1,11 +1,13 @@
 // Comprehensive test file for the screen module
 // This file contains tests for the screen module's functionality, including KMS/DRM and Wayland backends.
 
-use crate::screen::backend::{DisplayBackend, DisplayMode, DisplayOutput, ModeParams, RotationParams, BackendManager};
+use crate::screen::backend::{
+    BackendManager, DisplayBackend, DisplayMode, DisplayOutput, ModeParams, RotationParams,
+};
 use crate::screen::kmsdrm::DrmBackend;
+use crate::screen::parse_mode;
 use crate::screen::wayland::WaylandBackend;
 use crate::utils::error::RegmsgError;
-use crate::screen::parse_mode;
 
 // Test for DisplayMode serialization and deserialization
 #[test]
@@ -16,17 +18,15 @@ fn test_display_mode_serialization() {
         refresh_rate: 60,
         name: "1920x1080@60".to_string(),
     };
-    
+
     let serialized = serde_json::to_string(&mode).unwrap();
     let deserialized: DisplayMode = serde_json::from_str(&serialized).unwrap();
-    
+
     assert_eq!(mode.width, deserialized.width);
     assert_eq!(mode.height, deserialized.height);
     assert_eq!(mode.refresh_rate, deserialized.refresh_rate);
     assert_eq!(mode.name, deserialized.name);
 }
-
-
 
 // Test for BackendManager
 #[test]
@@ -37,22 +37,54 @@ fn test_backend_manager() {
     struct TestBackend;
     impl DisplayBackend for TestBackend {
         // Minimal implementation to satisfy the trait
-        fn list_outputs(&self) -> Result<Vec<DisplayOutput>, RegmsgError> { Ok(vec![]) }
-        fn list_modes(&self, _screen: Option<&str>) -> Result<Vec<DisplayMode>, RegmsgError> { Ok(vec![]) }
-        fn current_mode(&self, _screen: Option<&str>) -> Result<DisplayMode, RegmsgError> { Err(RegmsgError::NotFound("Test".to_string())) }
-        fn current_resolution(&self, _screen: Option<&str>) -> Result<(u32, u32), RegmsgError> { Ok((1920, 1080)) }
-        fn current_refresh_rate(&self, _screen: Option<&str>) -> Result<u32, RegmsgError> { Ok(60) }
-        fn current_rotation(&self, _screen: Option<&str>) -> Result<u32, RegmsgError> { Ok(0) }
-        fn set_mode(&self, _screen: Option<&str>, _mode: &ModeParams) -> Result<(), RegmsgError> { Ok(()) }
-        fn set_rotation(&self, _screen: Option<&str>, _rotation: &RotationParams) -> Result<(), RegmsgError> { Ok(()) }
-        fn set_max_resolution(&self, _screen: Option<&str>, _max_resolution: Option<&str>) -> Result<(), RegmsgError> { Ok(()) }
-        fn take_screenshot(&self, _screenshot_dir: &str) -> Result<String, RegmsgError> { Ok("/tmp/test.png".to_string()) }
-        fn map_touchscreen(&self) -> Result<(), RegmsgError> { Ok(()) }
-        fn backend_name(&self) -> &'static str { "Test" }
+        fn list_outputs(&self) -> Result<Vec<DisplayOutput>, RegmsgError> {
+            Ok(vec![])
+        }
+        fn list_modes(&self, _screen: Option<&str>) -> Result<Vec<DisplayMode>, RegmsgError> {
+            Ok(vec![])
+        }
+        fn current_mode(&self, _screen: Option<&str>) -> Result<DisplayMode, RegmsgError> {
+            Err(RegmsgError::NotFound("Test".to_string()))
+        }
+        fn current_resolution(&self, _screen: Option<&str>) -> Result<(u32, u32), RegmsgError> {
+            Ok((1920, 1080))
+        }
+        fn current_refresh_rate(&self, _screen: Option<&str>) -> Result<u32, RegmsgError> {
+            Ok(60)
+        }
+        fn current_rotation(&self, _screen: Option<&str>) -> Result<u32, RegmsgError> {
+            Ok(0)
+        }
+        fn set_mode(&self, _screen: Option<&str>, _mode: &ModeParams) -> Result<(), RegmsgError> {
+            Ok(())
+        }
+        fn set_rotation(
+            &self,
+            _screen: Option<&str>,
+            _rotation: &RotationParams,
+        ) -> Result<(), RegmsgError> {
+            Ok(())
+        }
+        fn set_max_resolution(
+            &self,
+            _screen: Option<&str>,
+            _max_resolution: Option<&str>,
+        ) -> Result<(), RegmsgError> {
+            Ok(())
+        }
+        fn take_screenshot(&self, _screenshot_dir: &str) -> Result<String, RegmsgError> {
+            Ok("/tmp/test.png".to_string())
+        }
+        fn map_touchscreen(&self) -> Result<(), RegmsgError> {
+            Ok(())
+        }
+        fn backend_name(&self) -> &'static str {
+            "Test"
+        }
     }
-    
+
     manager.add_backend(Box::new(TestBackend));
-    
+
     let active_backend = manager.get_active_backend();
     assert!(active_backend.is_some());
     assert_eq!(active_backend.unwrap().backend_name(), "Test");
@@ -62,7 +94,7 @@ fn test_backend_manager() {
 #[test]
 fn test_drm_backend_creation() {
     let backend = DrmBackend::new();
-    assert_eq!(backend.backend_name(), "DRM");
+    assert_eq!(backend.backend_name(), "KMS/DRM");
 }
 
 // Test for WaylandBackend (if possible to instantiate)
@@ -139,11 +171,19 @@ impl DisplayBackend for MockDrmBackend {
         Ok(())
     }
 
-    fn set_rotation(&self, _screen: Option<&str>, _rotation: &RotationParams) -> Result<(), RegmsgError> {
+    fn set_rotation(
+        &self,
+        _screen: Option<&str>,
+        _rotation: &RotationParams,
+    ) -> Result<(), RegmsgError> {
         Ok(())
     }
 
-    fn set_max_resolution(&self, _screen: Option<&str>, _max_resolution: Option<&str>) -> Result<(), RegmsgError> {
+    fn set_max_resolution(
+        &self,
+        _screen: Option<&str>,
+        _max_resolution: Option<&str>,
+    ) -> Result<(), RegmsgError> {
         Ok(())
     }
 
@@ -225,11 +265,19 @@ impl DisplayBackend for MockWaylandBackend {
         Ok(())
     }
 
-    fn set_rotation(&self, _screen: Option<&str>, _rotation: &RotationParams) -> Result<(), RegmsgError> {
+    fn set_rotation(
+        &self,
+        _screen: Option<&str>,
+        _rotation: &RotationParams,
+    ) -> Result<(), RegmsgError> {
         Ok(())
     }
 
-    fn set_max_resolution(&self, _screen: Option<&str>, _max_resolution: Option<&str>) -> Result<(), RegmsgError> {
+    fn set_max_resolution(
+        &self,
+        _screen: Option<&str>,
+        _max_resolution: Option<&str>,
+    ) -> Result<(), RegmsgError> {
         Ok(())
     }
 
@@ -249,23 +297,23 @@ impl DisplayBackend for MockWaylandBackend {
 #[test]
 fn test_mock_drm_backend_functionality() {
     let mock_backend = MockDrmBackend::new();
-    
+
     // Tests list_outputs
     let outputs = mock_backend.list_outputs().unwrap();
     assert!(outputs.is_empty());
-    
+
     // Tests list_modes
     let modes = mock_backend.list_modes(None).unwrap();
     assert!(modes.is_empty());
-    
+
     // Tests current_mode - should return an error since it's configured this way
     let current_mode_result = mock_backend.current_mode(None);
     assert!(current_mode_result.is_err());
-    
+
     // Tests current_rotation
     let rotation = mock_backend.current_rotation(None).unwrap();
     assert_eq!(rotation, 0);
-    
+
     // Tests backend_name
     assert_eq!(mock_backend.backend_name(), "MockDRM");
 }
@@ -273,23 +321,23 @@ fn test_mock_drm_backend_functionality() {
 #[test]
 fn test_mock_wayland_backend_functionality() {
     let mock_backend = MockWaylandBackend::new();
-    
+
     // Tests list_outputs
     let outputs = mock_backend.list_outputs().unwrap();
     assert!(outputs.is_empty());
-    
+
     // Tests list_modes
     let modes = mock_backend.list_modes(None).unwrap();
     assert!(modes.is_empty());
-    
+
     // Tests current_mode - should return an error since it's configured this way
     let current_mode_result = mock_backend.current_mode(None);
     assert!(current_mode_result.is_err());
-    
+
     // Tests current_rotation
     let rotation = mock_backend.current_rotation(None).unwrap();
     assert_eq!(rotation, 0);
-    
+
     // Tests backend_name
     assert_eq!(mock_backend.backend_name(), "MockWayland");
 }
@@ -355,7 +403,10 @@ fn test_invalid_rotation() {
     assert!(result.is_err());
     match result {
         Err(RegmsgError::InvalidArguments(_)) => assert!(true),
-        _ => assert!(false, "Expected InvalidArguments error for invalid rotation"),
+        _ => assert!(
+            false,
+            "Expected InvalidArguments error for invalid rotation"
+        ),
     }
 }
 
@@ -366,7 +417,10 @@ fn test_invalid_rotation_non_numeric() {
     assert!(result.is_err());
     match result {
         Err(RegmsgError::InvalidArguments(_)) => assert!(true),
-        _ => assert!(false, "Expected InvalidArguments error for non-numeric rotation"),
+        _ => assert!(
+            false,
+            "Expected InvalidArguments error for non-numeric rotation"
+        ),
     }
 }
 
@@ -377,7 +431,10 @@ fn test_invalid_mode_format() {
     assert!(result.is_err());
     match result {
         Err(RegmsgError::InvalidArguments(_)) => assert!(true),
-        _ => assert!(false, "Expected InvalidArguments error for invalid mode format"),
+        _ => assert!(
+            false,
+            "Expected InvalidArguments error for invalid mode format"
+        ),
     }
 }
 
@@ -388,7 +445,10 @@ fn test_invalid_mode_format_special_chars() {
     assert!(result.is_err());
     match result {
         Err(RegmsgError::InvalidArguments(_)) => assert!(true),
-        _ => assert!(false, "Expected InvalidArguments error for invalid mode format with special chars"),
+        _ => assert!(
+            false,
+            "Expected InvalidArguments error for invalid mode format with special chars"
+        ),
     }
 }
 

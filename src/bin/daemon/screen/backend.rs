@@ -5,6 +5,8 @@
 
 use crate::utils::error::Result;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
+use tracing::debug;
 
 /// Structure that represents display mode information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,10 +98,56 @@ impl BackendManager {
         self.backends.push(backend);
     }
 
-    /// Gets the active backend (first one that is available and functional)
-    pub fn get_active_backend(&self) -> Option<&dyn DisplayBackend> {
-        self.backends.first().map(|b| b.as_ref())
+    /// Checks if Wayland backend is available by checking for sway socket
+    fn is_wayland_available() -> bool {
+        Path::new("/var/run/sway-ipc.0.sock").exists()
     }
 
+    /// Checks if KMS/DRM backend is available by checking for DRM devices
+    fn is_kms_available() -> bool {
+        // Check if any DRM device exists in /dev/dri/ and if we can open them
+        if let Ok(entries) = std::fs::read_dir("/dev/dri/") {
+            for entry in entries.flatten() {
+                if let Some(filename) = entry.file_name().to_str() {
+                    if filename.starts_with("card") {
+                        // Try to use the existing DrmCard::open_available_card method
+                        if let Ok(_) = crate::screen::kmsdrm::DrmCard::open_available_card() {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
 
+    /// Gets the active backend based on real environment detection
+    pub fn get_active_backend(&self) -> Option<&dyn DisplayBackend> {
+        // Check backends in order of preference
+        for backend in &self.backends {
+            let backend_name = backend.backend_name();
+            match backend_name {
+                "Wayland" => {
+                    if Self::is_wayland_available() {
+                        debug!("Wayland backend is available and selected");
+                        return Some(backend.as_ref());
+                    }
+                    // If Wayland is not available, continue to next backend
+                }
+                "KMS/DRM" => {
+                    // For KMS/DRM, we just need to verify it's available since it's our fallback
+                    if Self::is_kms_available() {
+                        debug!("KMS/DRM backend is available and selected as fallback");
+                        return Some(backend.as_ref());
+                    }
+                }
+                _ => {
+                    // For other backends, return it if it exists
+                    // This maintains extensibility for future backends
+                    return Some(backend.as_ref());
+                }
+            }
+        }
+        None
+    }
 }

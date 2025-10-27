@@ -1026,7 +1026,6 @@ dependencies = [
  "clap",
  "drm",
  "futures",
- "log",
  "pkg-config",
  "serde",
  "serde_json",
