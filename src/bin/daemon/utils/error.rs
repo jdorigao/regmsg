@@ -40,6 +40,38 @@ pub enum RegmsgError {
     SystemError(String),
 }
 
+impl Clone for RegmsgError {
+    fn clone(&self) -> Self {
+        match self {
+            RegmsgError::BackendError { backend, message } => {
+                RegmsgError::BackendError {
+                    backend: backend.clone(),
+                    message: message.clone(),
+                }
+            }
+            RegmsgError::InvalidArguments(msg) => {
+                RegmsgError::InvalidArguments(msg.clone())
+            }
+            RegmsgError::IoError(_) => {
+                // For IoError, we'll create a generic version since std::io::Error doesn't implement Clone
+                RegmsgError::SystemError("I/O Error".to_string())
+            }
+            RegmsgError::ConversionError(msg) => {
+                RegmsgError::ConversionError(msg.clone())
+            }
+            RegmsgError::ParseError(msg) => {
+                RegmsgError::ParseError(msg.clone())
+            }
+            RegmsgError::NotFound(msg) => {
+                RegmsgError::NotFound(msg.clone())
+            }
+            RegmsgError::SystemError(msg) => {
+                RegmsgError::SystemError(msg.clone())
+            }
+        }
+    }
+}
+
 impl From<std::num::ParseIntError> for RegmsgError {
     fn from(error: std::num::ParseIntError) -> Self {
         RegmsgError::ParseError(error.to_string())

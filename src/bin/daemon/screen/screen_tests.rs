@@ -5,6 +5,7 @@ use crate::screen::backend::{DisplayBackend, DisplayMode, DisplayOutput, ModePar
 use crate::screen::kmsdrm::DrmBackend;
 use crate::screen::wayland::WaylandBackend;
 use crate::utils::error::RegmsgError;
+use crate::screen::parse_mode;
 
 // Test for DisplayMode serialization and deserialization
 #[test]
@@ -93,15 +94,24 @@ impl MockDrmBackend {
 
 impl DisplayBackend for MockDrmBackend {
     fn list_outputs(&self) -> Result<Vec<DisplayOutput>, RegmsgError> {
-        self.list_outputs_result.clone()
+        match &self.list_outputs_result {
+            Ok(outputs) => Ok(outputs.clone()),
+            Err(e) => Err(e.clone()),
+        }
     }
 
     fn list_modes(&self, _screen: Option<&str>) -> Result<Vec<DisplayMode>, RegmsgError> {
-        self.list_modes_result.clone()
+        match &self.list_modes_result {
+            Ok(modes) => Ok(modes.clone()),
+            Err(e) => Err(e.clone()),
+        }
     }
 
     fn current_mode(&self, _screen: Option<&str>) -> Result<DisplayMode, RegmsgError> {
-        self.current_mode_result.clone()
+        match &self.current_mode_result {
+            Ok(mode) => Ok(mode.clone()),
+            Err(e) => Err(e.clone()),
+        }
     }
 
     fn current_resolution(&self, _screen: Option<&str>) -> Result<(u32, u32), RegmsgError> {
@@ -119,7 +129,10 @@ impl DisplayBackend for MockDrmBackend {
     }
 
     fn current_rotation(&self, _screen: Option<&str>) -> Result<u32, RegmsgError> {
-        self.current_rotation_result
+        match &self.current_rotation_result {
+            Ok(rotation) => Ok(*rotation),
+            Err(e) => Err(e.clone()),
+        }
     }
 
     fn set_mode(&self, _screen: Option<&str>, _mode: &ModeParams) -> Result<(), RegmsgError> {
@@ -167,15 +180,24 @@ impl MockWaylandBackend {
 
 impl DisplayBackend for MockWaylandBackend {
     fn list_outputs(&self) -> Result<Vec<DisplayOutput>, RegmsgError> {
-        self.list_outputs_result.clone()
+        match &self.list_outputs_result {
+            Ok(outputs) => Ok(outputs.clone()),
+            Err(e) => Err(e.clone()),
+        }
     }
 
     fn list_modes(&self, _screen: Option<&str>) -> Result<Vec<DisplayMode>, RegmsgError> {
-        self.list_modes_result.clone()
+        match &self.list_modes_result {
+            Ok(modes) => Ok(modes.clone()),
+            Err(e) => Err(e.clone()),
+        }
     }
 
     fn current_mode(&self, _screen: Option<&str>) -> Result<DisplayMode, RegmsgError> {
-        self.current_mode_result.clone()
+        match &self.current_mode_result {
+            Ok(mode) => Ok(mode.clone()),
+            Err(e) => Err(e.clone()),
+        }
     }
 
     fn current_resolution(&self, _screen: Option<&str>) -> Result<(u32, u32), RegmsgError> {
@@ -193,7 +215,10 @@ impl DisplayBackend for MockWaylandBackend {
     }
 
     fn current_rotation(&self, _screen: Option<&str>) -> Result<u32, RegmsgError> {
-        self.current_rotation_result
+        match &self.current_rotation_result {
+            Ok(rotation) => Ok(*rotation),
+            Err(e) => Err(e.clone()),
+        }
     }
 
     fn set_mode(&self, _screen: Option<&str>, _mode: &ModeParams) -> Result<(), RegmsgError> {
@@ -384,4 +409,57 @@ fn test_backend_manager_with_no_backends() {
     let manager = BackendManager::new();
     let active_backend = manager.get_active_backend();
     assert!(active_backend.is_none());
+}
+
+// Tests for mode parsing functionality
+#[cfg(test)]
+mod parse_mode_tests {
+    use super::*;
+    use crate::screen::parse_mode;
+
+    #[test]
+    fn test_parse_mode_with_refresh_rate() {
+        let mode_info = parse_mode("1920x1080@60").unwrap();
+        assert_eq!(mode_info.width, 1920);
+        assert_eq!(mode_info.height, 1080);
+        assert_eq!(mode_info.vrefresh, 60);
+    }
+
+    #[test]
+    fn test_parse_mode_without_refresh_rate() {
+        let mode_info = parse_mode("1920x1080").unwrap();
+        assert_eq!(mode_info.width, 1920);
+        assert_eq!(mode_info.height, 1080);
+        assert_eq!(mode_info.vrefresh, 60); // Default value
+    }
+
+    #[test]
+    fn test_parse_mode_invalid_format() {
+        let result = parse_mode("invalid_format");
+        assert!(result.is_err());
+        match result {
+            Err(RegmsgError::InvalidArguments(_)) => assert!(true),
+            _ => assert!(false, "Expected InvalidArguments error"),
+        }
+    }
+
+    #[test]
+    fn test_parse_mode_only_width_and_height() {
+        let result = parse_mode("800x600");
+        assert!(result.is_ok());
+        let mode_info = result.unwrap();
+        assert_eq!(mode_info.width, 800);
+        assert_eq!(mode_info.height, 600);
+        assert_eq!(mode_info.vrefresh, 60); // Default value
+    }
+
+    #[test]
+    fn test_parse_mode_with_high_refresh_rate() {
+        let result = parse_mode("1920x1080@144");
+        assert!(result.is_ok());
+        let mode_info = result.unwrap();
+        assert_eq!(mode_info.width, 1920);
+        assert_eq!(mode_info.height, 1080);
+        assert_eq!(mode_info.vrefresh, 144);
+    }
 }

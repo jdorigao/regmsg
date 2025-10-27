@@ -8,6 +8,9 @@ pub mod backend;
 pub mod kmsdrm;
 pub mod wayland;
 
+#[cfg(test)]
+mod screen_tests;
+
 use tracing::{debug, error, info};
 
 /// Represents display mode information including width, height, and refresh rate.
@@ -15,7 +18,7 @@ use tracing::{debug, error, info};
 /// This struct is used to store parsed display mode details for further processing, such as
 /// setting or querying display configurations.
 #[derive(Debug)]
-struct ModeInfo {
+pub struct ModeInfo {
     width: i32,    // Screen width in pixels
     height: i32,   // Screen height in pixels
     vrefresh: i32, // Refresh rate in Hertz (Hz)
@@ -46,7 +49,7 @@ impl ScreenService {
 /// assert_eq!(mode.height, 1080);
 /// assert_eq!(mode.vrefresh, 60);
 /// ```
-fn parse_mode(mode: &str) -> Result<ModeInfo> {
+pub fn parse_mode(mode: &str) -> Result<ModeInfo> {
     debug!("Parsing display mode: {}", mode);
     let parts: Vec<&str> = mode.split(&['x', '@'][..]).collect();
     if parts.len() < 2 || parts.len() > 3 {
@@ -394,56 +397,5 @@ impl ScreenService {
         manager
             .get_active_backend()
             .ok_or_else(|| RegmsgError::SystemError("No backend available".to_string()))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_mode_with_refresh_rate() {
-        let mode_info = parse_mode("1920x1080@60").unwrap();
-        assert_eq!(mode_info.width, 1920);
-        assert_eq!(mode_info.height, 1080);
-        assert_eq!(mode_info.vrefresh, 60);
-    }
-
-    #[test]
-    fn test_parse_mode_without_refresh_rate() {
-        let mode_info = parse_mode("1920x1080").unwrap();
-        assert_eq!(mode_info.width, 1920);
-        assert_eq!(mode_info.height, 1080);
-        assert_eq!(mode_info.vrefresh, 60); // Default value
-    }
-
-    #[test]
-    fn test_parse_mode_invalid_format() {
-        let result = parse_mode("invalid_format");
-        assert!(result.is_err());
-        match result {
-            Err(RegmsgError::InvalidArguments(_)) => assert!(true),
-            _ => assert!(false, "Expected InvalidArguments error"),
-        }
-    }
-
-    #[test]
-    fn test_parse_mode_only_width_and_height() {
-        let result = parse_mode("800x600");
-        assert!(result.is_ok());
-        let mode_info = result.unwrap();
-        assert_eq!(mode_info.width, 800);
-        assert_eq!(mode_info.height, 600);
-        assert_eq!(mode_info.vrefresh, 60); // Default value
-    }
-
-    #[test]
-    fn test_parse_mode_with_high_refresh_rate() {
-        let result = parse_mode("1920x1080@144");
-        assert!(result.is_ok());
-        let mode_info = result.unwrap();
-        assert_eq!(mode_info.width, 1920);
-        assert_eq!(mode_info.height, 1080);
-        assert_eq!(mode_info.vrefresh, 144);
     }
 }
