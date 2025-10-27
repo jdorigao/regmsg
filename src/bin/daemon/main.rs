@@ -11,10 +11,10 @@ mod server;
 
 use async_std::channel::bounded;
 use async_std::stream::StreamExt;
-use log::info;
 use server::server::DaemonServer;
 use signal_hook::consts::signal::*;
 use signal_hook_async_std::Signals;
+use tracing;
 
 /// Main entry point for the regmsg daemon
 /// 
@@ -26,8 +26,10 @@ use signal_hook_async_std::Signals;
 /// * `Result<(), Box<dyn std::error::Error>>` - Ok if the daemon runs and shuts down successfully, or an error
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logger with flexible configuration via environment variables
-    env_logger::init();
+    // Initialize tracing with file and console output
+    crate::utils::tracing::setup_tracing();
+
+    tracing::info!("Starting regmsg daemon");
 
     // Create the daemon server with integrated command registry
     let mut daemon_server = DaemonServer::new()?;
@@ -50,6 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     signal_task.await;
     daemon_server.shutdown().await?;
 
+    tracing::info!("regmsg daemon shutdown completed");
     result
 }
 
@@ -66,7 +69,7 @@ async fn handle_signals(mut signals: Signals, shutdown_tx: async_std::channel::S
     while let Some(signal) = signals.next().await {
         match signal {
             SIGTERM | SIGINT => {
-                info!("Received signal {}, initiating shutdown", signal);
+                tracing::info!("Received signal {}, initiating shutdown", signal);
                 let _ = shutdown_tx.send(()).await;
                 break;
             }

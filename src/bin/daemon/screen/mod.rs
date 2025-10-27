@@ -1,5 +1,3 @@
-use log::{debug, error, info};
-
 // Import our new architecture modules
 use crate::screen::backend::{BackendManager, DisplayBackend, ModeParams};
 use crate::config;
@@ -9,6 +7,8 @@ use crate::utils::error::{RegmsgError, Result};
 pub mod backend;
 pub mod kmsdrm;
 pub mod wayland;
+
+use tracing::{debug, error, info};
 
 /// Represents display mode information including width, height, and refresh rate.
 ///

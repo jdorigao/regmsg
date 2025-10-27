@@ -1,4 +1,3 @@
-use log::{debug, error, info, warn};
 use std::fs::OpenOptions;
 use std::os::unix::io::{AsFd, BorrowedFd};
 use std::path::Path;
@@ -8,6 +7,8 @@ use drm::Device;
 
 use crate::screen::backend::{DisplayBackend, DisplayMode, DisplayOutput, ModeParams, RotationParams};
 use crate::utils::error::{RegmsgError, Result};
+
+use tracing::{debug, error, info, warn};
 
 const DRM_MODE_PATH: &str = "/var/run/drmMode";
 

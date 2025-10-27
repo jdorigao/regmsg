@@ -4,9 +4,9 @@
 //! It allows dynamic registration of commands with different argument patterns and execution behaviors.
 //! The system includes specialized command handlers for different use cases like screen management.
 
-use log::{debug, info, warn};
 use std::collections::HashMap;
 use std::fmt;
+use tracing::{debug, info, warn};
 
 /// Result type for command execution
 ///

@@ -10,11 +10,11 @@ use super::commands;
 use crate::config;
 use async_std::channel::Receiver;
 use futures::FutureExt;
-use log::{debug, error, info, warn};
 use std::fs;
 use std::time::Duration;
 use zeromq::prelude::*;
 use zeromq::{RepSocket, ZmqMessage};
+use tracing::{debug, error, info, warn};
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;

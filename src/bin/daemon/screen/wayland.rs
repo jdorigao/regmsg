@@ -1,5 +1,4 @@
 use chrono::Local;
-use log::{debug, error, info, warn};
 use std::collections::HashMap;
 use std::fs;
 use std::process::Command;
@@ -9,6 +8,8 @@ use crate::screen::backend::{
     DisplayBackend, DisplayMode, DisplayOutput, ModeParams, RotationParams,
 };
 use crate::utils::error::{RegmsgError, Result};
+
+use tracing::{debug, error, info, warn};
 
 /// Pre-processes a vector of outputs into a HashMap for efficient lookup by name.
 fn preprocess_outputs(outputs: Vec<Output>) -> HashMap<String, Output> {
