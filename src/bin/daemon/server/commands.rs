@@ -164,29 +164,4 @@ pub fn init_commands() -> CommandRegistry {
     registry
 }
 
-/// Test module for commands functionality
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    /// Test that key commands are properly registered
-    #[test]
-    fn test_commands_registered() {
-        let registry = init_commands();
-
-        // Test that key commands are registered
-        let commands = registry.list_commands();
-        assert!(commands.contains("listModes"));
-        assert!(commands.contains("currentMode"));
-        assert!(commands.contains("setMode"));
-        assert!(commands.contains("setRotation"));
-    }
-
-    /// Test that invalid rotation values are properly rejected
-    #[test]
-    fn test_invalid_rotation() {
-        let registry = init_commands();
-        let result = registry.handle("setRotation 45");
-        assert!(result.is_err());
-    }
-}

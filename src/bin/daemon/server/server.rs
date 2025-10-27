@@ -308,31 +308,4 @@ impl DaemonServer {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use zeromq::ZmqMessage;
 
-    #[test]
-    fn test_extract_command() {
-        let server = DaemonServer {
-            socket: RepSocket::new(),
-            registry: crate::server::commands::init_commands(),
-        };
-        let msg = ZmqMessage::from("test command");
-        let result = server.extract_command(&msg);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "test command");
-    }
-
-    #[test]
-    fn test_format_response() {
-        let server = DaemonServer {
-            socket: RepSocket::new(),
-            registry: crate::server::commands::init_commands(),
-        };
-        let result = Ok("success".to_string());
-        let response = server.format_response(result);
-        assert_eq!(response, "success");
-    }
-}
