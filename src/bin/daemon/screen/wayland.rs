@@ -5,7 +5,9 @@ use std::fs;
 use std::process::Command;
 use swayipc::{Connection, Output};
 
-use crate::screen::backend::{DisplayBackend, DisplayMode, DisplayOutput, ModeParams, RotationParams};
+use crate::screen::backend::{
+    DisplayBackend, DisplayMode, DisplayOutput, ModeParams, RotationParams,
+};
 use crate::utils::error::{RegmsgError, Result};
 
 /// Pre-processes a vector of outputs into a HashMap for efficient lookup by name.
@@ -53,7 +55,12 @@ fn convert_output_sway_to_internal(sway_output: &Output) -> DisplayOutput {
             width: mode.width as u32,
             height: mode.height as u32,
             refresh_rate: (mode.refresh as f32 / 1000.0).round() as u32, // Convert mHz to Hz
-            name: format!("{}x{}@{}Hz", mode.width, mode.height, (mode.refresh as f32 / 1000.0).round() as u32),
+            name: format!(
+                "{}x{}@{}Hz",
+                mode.width,
+                mode.height,
+                (mode.refresh as f32 / 1000.0).round() as u32
+            ),
         })
         .collect();
 
@@ -61,7 +68,12 @@ fn convert_output_sway_to_internal(sway_output: &Output) -> DisplayOutput {
         width: mode.width as u32,
         height: mode.height as u32,
         refresh_rate: (mode.refresh as f32 / 1000.0).round() as u32, // Convert mHz to Hz
-        name: format!("{}x{}@{}Hz", mode.width, mode.height, (mode.refresh as f32 / 1000.0).round() as u32),
+        name: format!(
+            "{}x{}@{}Hz",
+            mode.width,
+            mode.height,
+            (mode.refresh as f32 / 1000.0).round() as u32
+        ),
     });
 
     DisplayOutput {
@@ -91,9 +103,7 @@ impl WaylandBackend {
     pub fn new() -> Self {
         Self
     }
-    
 
-    
     /// Helper method to get sway connection
     fn get_connection(&self) -> Result<Connection> {
         // Try to get the sway socket path from environment or use default
@@ -108,11 +118,13 @@ impl WaylandBackend {
 impl DisplayBackend for WaylandBackend {
     fn list_outputs(&self) -> Result<Vec<DisplayOutput>> {
         let mut connection = self.get_connection()?;
-        let outputs: Vec<Output> = connection.get_outputs()
-            .map_err(|e| RegmsgError::BackendError {
-                backend: "Wayland".to_string(),
-                message: e.to_string(),
-            })?;
+        let outputs: Vec<Output> =
+            connection
+                .get_outputs()
+                .map_err(|e| RegmsgError::BackendError {
+                    backend: "Wayland".to_string(),
+                    message: e.to_string(),
+                })?;
 
         let internal_outputs = outputs
             .iter()
@@ -124,11 +136,13 @@ impl DisplayBackend for WaylandBackend {
 
     fn list_modes(&self, screen: Option<&str>) -> Result<Vec<DisplayMode>> {
         let mut connection = self.get_connection()?;
-        let outputs: Vec<Output> = connection.get_outputs()
-            .map_err(|e| RegmsgError::BackendError {
-                backend: "Wayland".to_string(),
-                message: e.to_string(),
-            })?;
+        let outputs: Vec<Output> =
+            connection
+                .get_outputs()
+                .map_err(|e| RegmsgError::BackendError {
+                    backend: "Wayland".to_string(),
+                    message: e.to_string(),
+                })?;
 
         let filtered_outputs: Vec<_> = filter_outputs(outputs, screen).collect();
 
@@ -139,7 +153,12 @@ impl DisplayBackend for WaylandBackend {
                     width: mode.width as u32,
                     height: mode.height as u32,
                     refresh_rate: (mode.refresh as f32 / 1000.0).round() as u32, // Convert mHz to Hz
-                    name: format!("{}x{}@{}Hz", mode.width, mode.height, (mode.refresh as f32 / 1000.0).round() as u32),
+                    name: format!(
+                        "{}x{}@{}Hz",
+                        mode.width,
+                        mode.height,
+                        (mode.refresh as f32 / 1000.0).round() as u32
+                    ),
                 })
             })
             .collect();
@@ -149,11 +168,13 @@ impl DisplayBackend for WaylandBackend {
 
     fn current_mode(&self, screen: Option<&str>) -> Result<DisplayMode> {
         let mut connection = self.get_connection()?;
-        let outputs: Vec<Output> = connection.get_outputs()
-            .map_err(|e| RegmsgError::BackendError {
-                backend: "Wayland".to_string(),
-                message: e.to_string(),
-            })?;
+        let outputs: Vec<Output> =
+            connection
+                .get_outputs()
+                .map_err(|e| RegmsgError::BackendError {
+                    backend: "Wayland".to_string(),
+                    message: e.to_string(),
+                })?;
 
         for output in filter_outputs(outputs, screen) {
             if let Some(current_mode) = &output.current_mode {
@@ -161,7 +182,12 @@ impl DisplayBackend for WaylandBackend {
                     width: current_mode.width as u32,
                     height: current_mode.height as u32,
                     refresh_rate: (current_mode.refresh as f32 / 1000.0).round() as u32, // Convert mHz to Hz
-                    name: format!("{}x{}@{}Hz", current_mode.width, current_mode.height, (current_mode.refresh as f32 / 1000.0).round() as u32),
+                    name: format!(
+                        "{}x{}@{}Hz",
+                        current_mode.width,
+                        current_mode.height,
+                        (current_mode.refresh as f32 / 1000.0).round() as u32
+                    ),
                 });
             }
         }
@@ -181,11 +207,13 @@ impl DisplayBackend for WaylandBackend {
 
     fn current_rotation(&self, screen: Option<&str>) -> Result<u32> {
         let mut connection = self.get_connection()?;
-        let outputs: Vec<Output> = connection.get_outputs()
-            .map_err(|e| RegmsgError::BackendError {
-                backend: "Wayland".to_string(),
-                message: e.to_string(),
-            })?;
+        let outputs: Vec<Output> =
+            connection
+                .get_outputs()
+                .map_err(|e| RegmsgError::BackendError {
+                    backend: "Wayland".to_string(),
+                    message: e.to_string(),
+                })?;
 
         for output in filter_outputs(outputs, screen) {
             match &output.transform {
@@ -207,7 +235,8 @@ impl DisplayBackend for WaylandBackend {
 
     fn set_mode(&self, screen: Option<&str>, mode: &ModeParams) -> Result<()> {
         let mut connection = self.get_connection()?;
-        let outputs = connection.get_outputs()
+        let outputs = connection
+            .get_outputs()
             .map_err(|e| RegmsgError::BackendError {
                 backend: "Wayland".to_string(),
                 message: e.to_string(),
@@ -224,7 +253,10 @@ impl DisplayBackend for WaylandBackend {
                     vec![output]
                 } else {
                     // Screen not found, return an error
-                    return Err(RegmsgError::NotFound(format!("Screen '{}' not found", screen_name)));
+                    return Err(RegmsgError::NotFound(format!(
+                        "Screen '{}' not found",
+                        screen_name
+                    )));
                 }
             }
             None => {
@@ -258,18 +290,19 @@ impl DisplayBackend for WaylandBackend {
             );
 
             // Execute the command and handle replies
-            let replies = connection.run_command(&command)
-                .map_err(|e| RegmsgError::BackendError {
-                    backend: "Wayland".to_string(),
-                    message: e.to_string(),
-                })?;
-
-            for reply in replies {
-                reply
+            let replies =
+                connection
+                    .run_command(&command)
                     .map_err(|e| RegmsgError::BackendError {
                         backend: "Wayland".to_string(),
                         message: e.to_string(),
                     })?;
+
+            for reply in replies {
+                reply.map_err(|e| RegmsgError::BackendError {
+                    backend: "Wayland".to_string(),
+                    message: e.to_string(),
+                })?;
             }
 
             info!(
@@ -294,16 +327,18 @@ impl DisplayBackend for WaylandBackend {
 
     fn set_rotation(&self, screen: Option<&str>, rotation: &RotationParams) -> Result<()> {
         let mut connection = self.get_connection()?;
-        let outputs: Vec<Output> = connection.get_outputs()
-            .map_err(|e| RegmsgError::BackendError {
-                backend: "Wayland".to_string(),
-                message: e.to_string(),
-            })?;
+        let outputs: Vec<Output> =
+            connection
+                .get_outputs()
+                .map_err(|e| RegmsgError::BackendError {
+                    backend: "Wayland".to_string(),
+                    message: e.to_string(),
+                })?;
 
         // Validate rotation value
         if ![0, 90, 180, 270].contains(&rotation.rotation) {
             return Err(RegmsgError::InvalidArguments(
-                "Rotation must be one of: 0, 90, 180, 270".to_string()
+                "Rotation must be one of: 0, 90, 180, 270".to_string(),
             ));
         }
 
@@ -311,18 +346,19 @@ impl DisplayBackend for WaylandBackend {
         for output in filter_outputs(outputs, screen) {
             // Construct and execute the IPC command to set rotation
             let command = format!("output {} transform {}", output.name, rotation.rotation);
-            let replies = connection.run_command(&command)
-                .map_err(|e| RegmsgError::BackendError {
-                    backend: "Wayland".to_string(),
-                    message: e.to_string(),
-                })?;
-
-            for reply in replies {
-                reply
+            let replies =
+                connection
+                    .run_command(&command)
                     .map_err(|e| RegmsgError::BackendError {
                         backend: "Wayland".to_string(),
                         message: e.to_string(),
                     })?;
+
+            for reply in replies {
+                reply.map_err(|e| RegmsgError::BackendError {
+                    backend: "Wayland".to_string(),
+                    message: e.to_string(),
+                })?;
             }
             info!(
                 "Rotation set to '{}' for output '{}'",
@@ -338,20 +374,22 @@ impl DisplayBackend for WaylandBackend {
             Some(res) => {
                 let parts: Vec<&str> = res.split('x').collect();
                 if parts.len() != 2 {
-                    return Err(RegmsgError::InvalidArguments(
-                        format!("Invalid resolution format: '{}'. Expected 'WxH'", res)
-                    ));
+                    return Err(RegmsgError::InvalidArguments(format!(
+                        "Invalid resolution format: '{}'. Expected 'WxH'",
+                        res
+                    )));
                 }
-                let width = parts[0]
-                    .parse::<u32>()
-                    .map_err(|e| RegmsgError::ParseError(format!("Failed to parse width: {}", e)))?;
-                let height = parts[1]
-                    .parse::<u32>()
-                    .map_err(|e| RegmsgError::ParseError(format!("Failed to parse height: {}", e)))?;
+                let width = parts[0].parse::<u32>().map_err(|e| {
+                    RegmsgError::ParseError(format!("Failed to parse width: {}", e))
+                })?;
+                let height = parts[1].parse::<u32>().map_err(|e| {
+                    RegmsgError::ParseError(format!("Failed to parse height: {}", e))
+                })?;
                 if width == 0 || height == 0 {
-                    return Err(RegmsgError::InvalidArguments(
-                        format!("Resolution dimensions must be positive: {}x{}", width, height)
-                    ));
+                    return Err(RegmsgError::InvalidArguments(format!(
+                        "Resolution dimensions must be positive: {}x{}",
+                        width, height
+                    )));
                 }
                 (width, height)
             }
@@ -359,11 +397,13 @@ impl DisplayBackend for WaylandBackend {
         };
 
         let mut connection = self.get_connection()?;
-        let outputs: Vec<Output> = connection.get_outputs()
-            .map_err(|e| RegmsgError::BackendError {
-                backend: "Wayland".to_string(),
-                message: e.to_string(),
-            })?;
+        let outputs: Vec<Output> =
+            connection
+                .get_outputs()
+                .map_err(|e| RegmsgError::BackendError {
+                    backend: "Wayland".to_string(),
+                    message: e.to_string(),
+                })?;
 
         // Determine target output (specified screen or focused output)
         let target_output = if let Some(screen_name) = screen {
@@ -390,7 +430,9 @@ impl DisplayBackend for WaylandBackend {
                 let best_mode = output
                     .modes
                     .iter()
-                    .filter(|mode| mode.width as u32 <= max_width && mode.height as u32 <= max_height)
+                    .filter(|mode| {
+                        mode.width as u32 <= max_width && mode.height as u32 <= max_height
+                    })
                     .max_by_key(|mode| (mode.width as u32) * (mode.height as u32));
 
                 if let Some(mode) = best_mode {
@@ -401,17 +443,19 @@ impl DisplayBackend for WaylandBackend {
                         mode.height,
                         format_refresh(mode.refresh)
                     );
-                    
-                    for reply in connection.run_command(&command)
-                        .map_err(|e| RegmsgError::BackendError {
-                            backend: "Wayland".to_string(),
-                            message: e.to_string(),
-                        })? {
-                        reply
+
+                    for reply in
+                        connection
+                            .run_command(&command)
                             .map_err(|e| RegmsgError::BackendError {
                                 backend: "Wayland".to_string(),
                                 message: e.to_string(),
-                            })?;
+                            })?
+                    {
+                        reply.map_err(|e| RegmsgError::BackendError {
+                            backend: "Wayland".to_string(),
+                            message: e.to_string(),
+                        })?;
                     }
                     info!(
                         "Resolution set to {}x{} for output '{}'",
@@ -431,18 +475,27 @@ impl DisplayBackend for WaylandBackend {
 
     fn take_screenshot(&self, screenshot_dir: &str) -> Result<String> {
         info!("Capturing screenshot.");
-        
+
         // Check if `grim` is available
-        if !Command::new("grim").arg("--version").output().map_err(|e| RegmsgError::SystemError(e.to_string()))?.status.success() {
-            return Err(RegmsgError::SystemError("grim is not installed or unavailable".to_string()));
+        if !Command::new("grim")
+            .output()
+            .map_err(|e| RegmsgError::SystemError(e.to_string()))?
+            .status
+            .success()
+        {
+            return Err(RegmsgError::SystemError(
+                "grim is not installed or unavailable".to_string(),
+            ));
         }
 
         let mut connection = self.get_connection()?;
-        let outputs: Vec<Output> = connection.get_outputs()
-            .map_err(|e| RegmsgError::BackendError {
-                backend: "Wayland".to_string(),
-                message: e.to_string(),
-            })?;
+        let outputs: Vec<Output> =
+            connection
+                .get_outputs()
+                .map_err(|e| RegmsgError::BackendError {
+                    backend: "Wayland".to_string(),
+                    message: e.to_string(),
+                })?;
 
         // Find the active output
         let output_name = outputs
@@ -452,8 +505,7 @@ impl DisplayBackend for WaylandBackend {
             .ok_or_else(|| RegmsgError::NotFound("No active output found".to_string()))?;
 
         // Ensure screenshot directory exists
-        fs::create_dir_all(screenshot_dir)
-            .map_err(|e| RegmsgError::SystemError(e.to_string()))?;
+        fs::create_dir_all(screenshot_dir).map_err(|e| RegmsgError::SystemError(e.to_string()))?;
 
         // Generate timestamped filename
         let file_name = format!(
@@ -473,7 +525,10 @@ impl DisplayBackend for WaylandBackend {
         if !grim_output.status.success() {
             let error_message = String::from_utf8_lossy(&grim_output.stderr);
             error!("Failed to capture screen: {}", error_message);
-            return Err(RegmsgError::SystemError(format!("Failed to capture screen: {}", error_message)));
+            return Err(RegmsgError::SystemError(format!(
+                "Failed to capture screen: {}",
+                error_message
+            )));
         }
         info!("Screenshot saved in: {}", file_name);
         Ok(file_name)
@@ -483,7 +538,8 @@ impl DisplayBackend for WaylandBackend {
         let mut connection = self.get_connection()?;
 
         // Get list of input devices
-        let inputs = connection.get_inputs()
+        let inputs = connection
+            .get_inputs()
             .map_err(|e| RegmsgError::BackendError {
                 backend: "Wayland".to_string(),
                 message: e.to_string(),
@@ -498,12 +554,15 @@ impl DisplayBackend for WaylandBackend {
         let touchscreen_id = match touchscreen {
             Some(id) => id,
             None => {
-                return Err(RegmsgError::NotFound("No touchscreen device found".to_string()));
+                return Err(RegmsgError::NotFound(
+                    "No touchscreen device found".to_string(),
+                ));
             }
         };
 
         // Get list of outputs
-        let outputs = connection.get_outputs()
+        let outputs = connection
+            .get_outputs()
             .map_err(|e| RegmsgError::BackendError {
                 backend: "Wayland".to_string(),
                 message: e.to_string(),
@@ -524,18 +583,18 @@ impl DisplayBackend for WaylandBackend {
 
         // Construct and execute IPC command to map touchscreen
         let command = format!("input {} map_to_output {}", touchscreen_id, output_name);
-        let replies = connection.run_command(&command)
+        let replies = connection
+            .run_command(&command)
             .map_err(|e| RegmsgError::BackendError {
                 backend: "Wayland".to_string(),
                 message: e.to_string(),
             })?;
 
         for reply in replies {
-            reply
-                .map_err(|e| RegmsgError::BackendError {
-                    backend: "Wayland".to_string(),
-                    message: e.to_string(),
-                })?;
+            reply.map_err(|e| RegmsgError::BackendError {
+                backend: "Wayland".to_string(),
+                message: e.to_string(),
+            })?;
         }
 
         info!(
