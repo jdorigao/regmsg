@@ -1,6 +1,6 @@
 // Import our new architecture modules
-use crate::screen::backend::{BackendManager, DisplayBackend, ModeParams};
 use crate::config;
+use crate::screen::backend::{DisplayBackend, ModeParams};
 use crate::utils::error::{RegmsgError, Result};
 
 // Modules for backend-specific implementations
@@ -25,11 +25,9 @@ pub struct ModeInfo {
 }
 
 /// Service structure that handles all screen operations using the new architecture
-pub struct ScreenService {
-}
+pub struct ScreenService {}
 
-impl ScreenService {
-}
+impl ScreenService {}
 
 /// Parses a display mode string in the format "WxH@R" or "WxH".
 ///
@@ -378,24 +376,22 @@ pub fn current_backend() -> Result<String> {
 impl ScreenService {
     /// Gets a reference to the active backend (helper for current functions)
     fn default_backend() -> Result<&'static dyn DisplayBackend> {
-        // For simplicity in this refactoring, we'll return a static reference to a backend
-        // In a real implementation, we'd have a singleton or similar pattern
-        use std::sync::OnceLock;
-        static BACKEND_MANAGER: OnceLock<BackendManager> = OnceLock::new();
+        use std::path::Path;
 
-        let manager = BACKEND_MANAGER.get_or_init(|| {
-            let mut backend_manager = BackendManager::new();
-            // Add backends in order of preference
-
-            // Always add both backends - the system will try to use the first available one
-            backend_manager.add_backend(Box::new(crate::screen::wayland::WaylandBackend::new()));
-            backend_manager.add_backend(Box::new(crate::screen::kmsdrm::DrmBackend::new()));
-
-            backend_manager
-        });
-
-        manager
-            .get_active_backend()
-            .ok_or_else(|| RegmsgError::SystemError("No backend available".to_string()))
+        // Direct check: if Wayland socket exists, use Wayland backend; otherwise use KMS/DRM
+        if Path::new(config::DEFAULT_SWAYSOCK_PATH).exists() {
+            // Return a static reference to a Wayland backend instance
+            static WAYLAND_BACKEND: std::sync::OnceLock<crate::screen::wayland::WaylandBackend> =
+                std::sync::OnceLock::new();
+            let backend =
+                WAYLAND_BACKEND.get_or_init(|| crate::screen::wayland::WaylandBackend::new());
+            Ok(backend)
+        } else {
+            // Return a static reference to a DRM backend instance
+            static DRM_BACKEND: std::sync::OnceLock<crate::screen::kmsdrm::DrmBackend> =
+                std::sync::OnceLock::new();
+            let backend = DRM_BACKEND.get_or_init(|| crate::screen::kmsdrm::DrmBackend::new());
+            Ok(backend)
+        }
     }
 }

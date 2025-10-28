@@ -3,8 +3,6 @@
 //! This module defines traits and implementations for different display backends
 //! (Wayland, DRM/KMS, etc.), enabling a more modular and extensible architecture.
 
-use std::path::Path;
-use tracing::debug;
 use crate::utils::error::Result;
 use serde::{Deserialize, Serialize};
 
@@ -78,93 +76,4 @@ pub trait DisplayBackend: Send + Sync {
 
     /// Gets the backend name
     fn backend_name(&self) -> &'static str;
-}
-
-/// Backend manager that can handle multiple backends
-pub struct BackendManager {
-    backends: Vec<Box<dyn DisplayBackend>>,
-}
-
-impl BackendManager {
-    /// Creates a new backend manager
-    pub fn new() -> Self {
-        Self {
-            backends: Vec::new(),
-        }
-    }
-
-    /// Adds a backend to the manager
-    pub fn add_backend(&mut self, backend: Box<dyn DisplayBackend>) {
-        self.backends.push(backend);
-    }
-
-    /// Checks if Wayland backend is available by checking for sway socket
-    fn is_wayland_available() -> bool {
-        // Check for sway socket in common location
-        let socket_exists = Path::new("/var/run/sway-ipc.0.sock").exists();
-        debug!("Wayland socket /var/run/sway-ipc.0.sock exists: {}", socket_exists);
-        
-        // If socket exists, consider Wayland available regardless of environment
-        // This follows the approach from the original working implementation
-        socket_exists
-    }
-
-    /// Checks if KMS/DRM backend is available by checking for DRM devices
-    fn is_kms_available() -> bool {
-        // Check if any DRM device exists in /dev/dri/
-        if let Ok(entries) = std::fs::read_dir("/dev/dri/") {
-            for entry in entries.flatten() {
-                if let Some(filename) = entry.file_name().to_str() {
-                    debug!("Found DRM device: {}", filename);
-                    if filename.starts_with("card") {
-                        debug!("KMS/DRM backend available: {}", filename);
-                        return true; // If we find a card device, KMS/DRM is available
-                    }
-                }
-            }
-        }
-        debug!("No DRM card devices found");
-        false
-    }
-
-    /// Gets the active backend based on real environment detection
-    pub fn get_active_backend(&self) -> Option<&dyn DisplayBackend> {
-        debug!("Starting backend detection");
-        
-        // Check backends in order of preference
-        for backend in &self.backends {
-            let backend_name = backend.backend_name();
-            debug!("Checking backend: {}", backend_name);
-            
-            match backend_name {
-                "Wayland" => {
-                    if Self::is_wayland_available() {
-                        debug!("Wayland backend is available and selected");
-                        return Some(backend.as_ref());
-                    } else {
-                        debug!("Wayland backend not available, checking next");
-                        // If Wayland is not available, continue to next backend
-                    }
-                }
-                "KMS/DRM" => {
-                    // For KMS/DRM, we just need to verify it's available since it's our fallback
-                    if Self::is_kms_available() {
-                        debug!("KMS/DRM backend is available and selected");
-                        return Some(backend.as_ref());
-                    } else {
-                        debug!("KMS/DRM backend not available");
-                    }
-                }
-                _ => {
-                    // For other backends, return it if it exists
-                    // This maintains extensibility for future backends
-                    debug!("Unknown backend type: {}", backend_name);
-                    return Some(backend.as_ref());
-                }
-            }
-        }
-        
-        debug!("No backend available");
-        None
-    }
 }

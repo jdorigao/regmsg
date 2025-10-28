@@ -60,7 +60,7 @@ cc = "1.2"
 pkg-config = "0.3"
 
 [profile.release]
-lto = true          # Enable Link Time Optimization for smaller binaries
+lto = "fat"         # Enable Fat Link Time Optimization for maximum optimization
 codegen-units = 1   # Better optimization with single codegen unit
 panic = "abort"     # Smaller binaries by removing panic infrastructure (no backtrace)
 opt-level = 3       # Maximum optimization for performance

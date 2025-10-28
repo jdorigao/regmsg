@@ -2,7 +2,7 @@
 // This file contains tests for the screen module's functionality, including KMS/DRM and Wayland backends.
 
 use crate::screen::backend::{
-    BackendManager, DisplayBackend, DisplayMode, DisplayOutput, ModeParams, RotationParams,
+    DisplayBackend, DisplayMode, DisplayOutput, ModeParams, RotationParams,
 };
 use crate::screen::kmsdrm::DrmBackend;
 use crate::screen::parse_mode;
@@ -26,68 +26,6 @@ fn test_display_mode_serialization() {
     assert_eq!(mode.height, deserialized.height);
     assert_eq!(mode.refresh_rate, deserialized.refresh_rate);
     assert_eq!(mode.name, deserialized.name);
-}
-
-// Test for BackendManager
-#[test]
-fn test_backend_manager() {
-    let mut manager = BackendManager::new();
-    // Adding mock or real backends for testing
-    // Here, we'll use the test backend just for demonstration purposes
-    struct TestBackend;
-    impl DisplayBackend for TestBackend {
-        // Minimal implementation to satisfy the trait
-        fn list_outputs(&self) -> Result<Vec<DisplayOutput>, RegmsgError> {
-            Ok(vec![])
-        }
-        fn list_modes(&self, _screen: Option<&str>) -> Result<Vec<DisplayMode>, RegmsgError> {
-            Ok(vec![])
-        }
-        fn current_mode(&self, _screen: Option<&str>) -> Result<DisplayMode, RegmsgError> {
-            Err(RegmsgError::NotFound("Test".to_string()))
-        }
-        fn current_resolution(&self, _screen: Option<&str>) -> Result<(u32, u32), RegmsgError> {
-            Ok((1920, 1080))
-        }
-        fn current_refresh_rate(&self, _screen: Option<&str>) -> Result<u32, RegmsgError> {
-            Ok(60)
-        }
-        fn current_rotation(&self, _screen: Option<&str>) -> Result<u32, RegmsgError> {
-            Ok(0)
-        }
-        fn set_mode(&self, _screen: Option<&str>, _mode: &ModeParams) -> Result<(), RegmsgError> {
-            Ok(())
-        }
-        fn set_rotation(
-            &self,
-            _screen: Option<&str>,
-            _rotation: &RotationParams,
-        ) -> Result<(), RegmsgError> {
-            Ok(())
-        }
-        fn set_max_resolution(
-            &self,
-            _screen: Option<&str>,
-            _max_resolution: Option<&str>,
-        ) -> Result<(), RegmsgError> {
-            Ok(())
-        }
-        fn take_screenshot(&self, _screenshot_dir: &str) -> Result<String, RegmsgError> {
-            Ok("/tmp/test.png".to_string())
-        }
-        fn map_touchscreen(&self) -> Result<(), RegmsgError> {
-            Ok(())
-        }
-        fn backend_name(&self) -> &'static str {
-            "Test"
-        }
-    }
-
-    manager.add_backend(Box::new(TestBackend));
-
-    let active_backend = manager.get_active_backend();
-    assert!(active_backend.is_some());
-    assert_eq!(active_backend.unwrap().backend_name(), "Test");
 }
 
 // Test for DrmBackend (if possible to instantiate)
@@ -463,13 +401,7 @@ fn test_mode_with_zero_values() {
     assert_eq!(mode_info.vrefresh, 0);
 }
 
-#[test]
-fn test_backend_manager_with_no_backends() {
-    // Tests BackendManager when no backend is available
-    let manager = BackendManager::new();
-    let active_backend = manager.get_active_backend();
-    assert!(active_backend.is_none());
-}
+
 
 // Tests for mode parsing functionality
 #[cfg(test)]

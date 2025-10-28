@@ -31,8 +31,8 @@ fn format_refresh(refresh: i32) -> String {
 }
 
 /// Filters a collection of outputs based on an optional screen name.
-fn filter_outputs(outputs: Vec<Output>, screen: Option<&str>) -> impl Iterator<Item = Output> {
-    outputs.into_iter().filter(move |output| {
+fn filter_outputs<'a>(outputs: &'a [Output], screen: Option<&str>) -> impl Iterator<Item = &'a Output> {
+    outputs.iter().filter(move |output| {
         screen.map_or(true, |screen_name| {
             let matches = output.name == screen_name;
             if !matches {
@@ -107,11 +107,10 @@ impl WaylandBackend {
 
     /// Helper method to get sway connection
     fn get_connection(&self) -> Result<Connection> {
-        // Try to get the sway socket path from environment or use default
         Connection::new()
             .map_err(|e| RegmsgError::BackendError {
                 backend: "Wayland".to_string(),
-                message: format!("Failed to connect to Wayland/Sway: {}. This could be because the Wayland display server is not running or regmsg doesn't have permission to access it.", e),
+                message: format!("Failed to connect to Wayland/Sway: {}", e),
             })
     }
 }
@@ -145,10 +144,7 @@ impl DisplayBackend for WaylandBackend {
                     message: e.to_string(),
                 })?;
 
-        let filtered_outputs: Vec<_> = filter_outputs(outputs, screen).collect();
-
-        let all_modes: Vec<DisplayMode> = filtered_outputs
-            .iter()
+        let all_modes: Vec<DisplayMode> = filter_outputs(&outputs, screen)
             .flat_map(|output| {
                 output.modes.iter().map(|mode| DisplayMode {
                     width: mode.width as u32,
@@ -177,7 +173,7 @@ impl DisplayBackend for WaylandBackend {
                     message: e.to_string(),
                 })?;
 
-        for output in filter_outputs(outputs, screen) {
+        for output in filter_outputs(&outputs, screen) {
             if let Some(current_mode) = &output.current_mode {
                 return Ok(DisplayMode {
                     width: current_mode.width as u32,
@@ -216,7 +212,7 @@ impl DisplayBackend for WaylandBackend {
                     message: e.to_string(),
                 })?;
 
-        for output in filter_outputs(outputs, screen) {
+        for output in filter_outputs(&outputs, screen) {
             match &output.transform {
                 Some(transform_str) => {
                     // Parse transform string to rotation value
@@ -344,7 +340,7 @@ impl DisplayBackend for WaylandBackend {
         }
 
         // Iterate over filtered outputs
-        for output in filter_outputs(outputs, screen) {
+        for output in filter_outputs(&outputs, screen) {
             // Construct and execute the IPC command to set rotation
             let command = format!("output {} transform {}", output.name, rotation.rotation);
             let replies =
@@ -408,9 +404,9 @@ impl DisplayBackend for WaylandBackend {
 
         // Determine target output (specified screen or focused output)
         let target_output = if let Some(screen_name) = screen {
-            filter_outputs(outputs, Some(screen_name)).next()
+            filter_outputs(&outputs, Some(screen_name)).next()
         } else {
-            outputs.into_iter().find(|output| output.focused)
+            outputs.iter().find(|output| output.focused)
         };
 
         if let Some(output) = target_output {
