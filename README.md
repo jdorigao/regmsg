@@ -34,6 +34,83 @@ The compiled binary will be located in the `target/release` directory.
 - A Wayland compositor (e.g., Sway)
 - DRM support
 
+## Cross-compilation
+
+You have multiple options for cross-compilation to aarch64 (ARM64):
+
+### Option 1: Direct cross-compilation (Traditional method)
+
+1. Install the aarch64 target:
+```bash
+rustup target add aarch64-unknown-linux-gnu
+```
+
+2. Install cross-compilation tools:
+```bash
+# On Ubuntu/Debian:
+sudo apt install gcc-aarch64-linux-gnu pkg-config-aarch64-linux-gnu
+
+# On Fedora/RHEL:
+sudo dnf install gcc-aarch64-linux-gnu pkg-config
+
+# On Arch Linux:
+sudo pacman -S gcc-aarch64-linux-gnu
+```
+
+3. Set up environment variables for cross-compilation (Linux):
+```bash
+export PKG_CONFIG_ALLOW_CROSS=1
+export PKG_CONFIG_PATH_aarch64_unknown_linux_gnu=/usr/lib/aarch64-linux-gnu/pkgconfig
+export PKG_CONFIG_SYSROOT_DIR=/
+```
+
+4. Build for aarch64:
+```bash
+cargo build --target aarch64-unknown-linux-gnu --release
+```
+
+The cross-compiled binaries will be located in `target/aarch64-unknown-linux-gnu/release/`.
+
+### Option 2: Docker-based cross-compilation (Recommended)
+
+Using Docker makes cross-compilation easier as it handles all dependencies:
+
+1. Make sure Docker is installed and running
+2. Use the provided Docker build script:
+
+```bash
+./build-scripts/docker-build.sh --target aarch64
+```
+
+Or build manually with Docker:
+```bash
+docker build --platform linux/aarch64 -t regmsg-aarch64 -f Dockerfile .
+```
+
+### Option 3: Using Docker Compose
+
+You can also use Docker Compose for building and running:
+
+```bash
+# Build for aarch64
+docker-compose run regmsg-builder-aarch64
+
+# Build for x86_64
+docker-compose run regmsg-builder-native
+```
+
+### Using the build scripts
+
+For convenience, use the provided build scripts:
+
+```bash
+# For traditional cross-compilation:
+./build-scripts/cross-compile.sh --target aarch64-unknown-linux-gnu
+
+# For Docker-based build:
+./build-scripts/docker-build.sh --target aarch64
+```
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).

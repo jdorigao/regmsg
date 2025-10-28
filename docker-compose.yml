@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  regmsg-native:
+    build:
+      context: .
+      dockerfile: Dockerfile.x86_64
+    platform: linux/amd64
+    container_name: regmsg-native
+    volumes:
+      - /tmp:/tmp
+      - /dev/dri:/dev/dri  # For DRM access
+    network_mode: host  # For direct access to system resources
+    command: ["regmsg", "--help"]
+
+  regmsg-aarch64:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: linux/aarch64
+    container_name: regmsg-aarch64
+    volumes:
+      - /tmp:/tmp
+      - /dev/dri:/dev/dri  # For DRM access
+    network_mode: host  # For direct access to system resources
+    command: ["regmsg", "--help"]
+
+  regmsg-builder-native:
+    build:
+      context: .
+      dockerfile: Dockerfile.x86_64
+    platform: linux/amd64
+    container_name: regmsg-builder-native
+    volumes:
+      - .:/usr/src/regmsg
+      - /tmp:/tmp
+    working_dir: /usr/src/regmsg
+    command: ["cargo", "build", "--release"]
+
+  regmsg-builder-aarch64:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: linux/aarch64
+    container_name: regmsg-builder-aarch64
+    volumes:
+      - .:/usr/src/regmsg
+      - /tmp:/tmp
+    working_dir: /usr/src/regmsg
+    command: ["cargo", "build", "--target", "aarch64-unknown-linux-gnu", "--release"]

@@ -1,0 +1,42 @@
+# Use a multi-stage build to keep the final image small
+# First stage: Build the application
+FROM rust:1.80 as builder
+
+# Install required build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    pkg-config \
+    libdrm-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/regmsg
+
+# Copy the project files
+COPY . .
+
+# Build the project
+RUN cargo build --release
+
+# Second stage: Create a minimal runtime image
+FROM ubuntu:22.04
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libdrm2 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /root/
+
+# Copy the built binaries from the builder stage
+COPY --from=builder /usr/src/regmsg/target/release/regmsg /usr/local/bin/regmsg
+COPY --from=builder /usr/src/regmsg/target/release/regmsgd /usr/local/bin/regmsgd
+
+# Copy the init script if needed
+COPY --from=builder /usr/src/regmsg/init/S06regmsgd /etc/init.d/S06regmsgd
+
+# Set up default environment
+ENV RUST_BACKTRACE=1
+
+# Default command is to show help
+CMD ["/usr/local/bin/regmsg", "--help"]
