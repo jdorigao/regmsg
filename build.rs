@@ -107,7 +107,17 @@ fn main() {
     // This tells the Rust linker to link against libdrmhook.so during compilation.
     println!("cargo:rustc-link-lib=dylib=drmhook");
 
+    // Copy the init script to the same directory as the binaries
+    let init_script_path = "init/S06regmsgd";
+    let final_init_path = format!("target/{}/S06regmsgd", profile);
+    
+    // Copy the init script to the target/profile directory
+    fs::copy(&init_script_path, &final_init_path).expect("Failed to copy init script to destination directory");
+
     // Inform Cargo to re-run this build script if the drmhook.c source file changes.
     // This ensures the C library is rebuilt when the source code is modified.
     println!("cargo:rerun-if-changed=lib/drmhook.c");
+    
+    // Also make sure to re-run if the init script changes
+    println!("cargo:rerun-if-changed=init/S06regmsgd");
 }
