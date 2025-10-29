@@ -12,9 +12,8 @@ mod server;
 use async_std::channel::bounded;
 use async_std::stream::StreamExt;
 use server::server::DaemonServer;
-use signal_hook::consts::signal::*;
+use signal_hook::consts::signal::{SIGTERM, SIGINT};
 use signal_hook_async_std::Signals;
-use tracing;
 
 /// Main entry point for the regmsg daemon
 /// 
