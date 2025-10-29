@@ -33,6 +33,18 @@ mod commands_tests {
         assert!(commands.contains("currentRefresh"));
         assert!(commands.contains("minToMaxResolution"));
         assert!(commands.contains("setOutput"));
+        assert!(commands.contains("listCommands"));
+    }
+
+    /// Test listCommands execution
+    #[test]
+    fn test_list_commands_execution() {
+        let registry = crate::server::commands::init_commands();
+        let result = registry.handle("listCommands");
+        assert!(result.is_ok());
+        let output = result.unwrap();
+        // The output should contain at least some command names
+        assert!(output.contains("listModes") || output.contains("currentMode") || output.contains("setMode"));
     }
 
     /// Test that invalid rotation values are properly rejected
