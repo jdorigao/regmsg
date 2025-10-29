@@ -2,10 +2,12 @@ use std::fs::OpenOptions;
 use std::os::unix::io::{AsFd, BorrowedFd};
 use std::path::Path;
 
-use drm::control::{Device as ControlDevice, connector};
 use drm::Device;
+use drm::control::{Device as ControlDevice, connector};
 
-use crate::screen::backend::{DisplayBackend, DisplayMode, DisplayOutput, ModeParams, RotationParams};
+use crate::screen::backend::{
+    DisplayBackend, DisplayMode, DisplayOutput, ModeParams, RotationParams,
+};
 use crate::utils::error::{RegmsgError, Result};
 
 use tracing::{debug, error, info, warn};
@@ -35,7 +37,8 @@ impl DrmCard {
         let mut best_card = None;
         let mut max_connectors = 0;
 
-        for entry in dri_path.read_dir()
+        for entry in dri_path
+            .read_dir()
             .map_err(|e| RegmsgError::SystemError(format!("Failed to read dir: {}", e)))?
             .filter_map(std::result::Result::ok)
         {
@@ -88,7 +91,9 @@ impl DrmCard {
             Ok(card)
         } else {
             error!("No functional DRM device found in {:?}.", dri_path);
-            Err(RegmsgError::SystemError("No DRM device found or accessible".to_string()))
+            Err(RegmsgError::SystemError(
+                "No DRM device found or accessible".to_string(),
+            ))
         }
     }
 }
@@ -100,8 +105,6 @@ impl DrmBackend {
     pub fn new() -> Self {
         Self
     }
-    
-
 
     /// Helper to iterate over connectors
     fn for_each_connector<F>(&self, screen: Option<&str>, mut f: F) -> Result<()>
@@ -110,12 +113,13 @@ impl DrmBackend {
     {
         debug!("Fetching resource handles for DRM device");
         let card = DrmCard::open_available_card()?;
-        let resources = card.resource_handles()
+        let resources = card
+            .resource_handles()
             .map_err(|e| RegmsgError::BackendError {
                 backend: "DRM".to_string(),
                 message: e.to_string(),
             })?;
-        
+
         let connectors = resources.connectors();
         debug!("Found {} connectors", connectors.len());
 
@@ -132,7 +136,7 @@ impl DrmBackend {
                             continue;
                         }
                     }
-                    
+
                     f(&connector_info)?;
                 }
                 Err(e) => {
@@ -153,7 +157,7 @@ impl DrmBackend {
 impl DisplayBackend for DrmBackend {
     fn list_outputs(&self) -> Result<Vec<DisplayOutput>> {
         let mut outputs = Vec::new();
-        
+
         self.for_each_connector(None, |connector_info| {
             let name = format!("{:?}", connector_info.interface());
             let modes = connector_info
@@ -193,7 +197,7 @@ impl DisplayBackend for DrmBackend {
 
     fn list_modes(&self, screen: Option<&str>) -> Result<Vec<DisplayMode>> {
         let mut all_modes = Vec::new();
-        
+
         self.for_each_connector(screen, |connector_info| {
             let modes = connector_info
                 .modes()
@@ -205,7 +209,7 @@ impl DisplayBackend for DrmBackend {
                     name: format!("{}x{}@{}Hz", mode.size().0, mode.size().1, mode.vrefresh()),
                 })
                 .collect::<Vec<_>>();
-            
+
             all_modes.extend(modes);
             Ok(())
         })?;
@@ -215,7 +219,7 @@ impl DisplayBackend for DrmBackend {
 
     fn current_mode(&self, screen: Option<&str>) -> Result<DisplayMode> {
         let mut current_mode = None;
-        
+
         self.for_each_connector(screen, |connector_info| {
             if connector_info.state() == connector::State::Connected {
                 debug!(
@@ -225,24 +229,31 @@ impl DisplayBackend for DrmBackend {
                 if let Some(encoder_id) = connector_info.current_encoder() {
                     debug!("Fetching encoder info for ID {:?}", encoder_id);
                     let card = DrmCard::open_available_card()?;
-                    let encoder_info = card.get_encoder(encoder_id)
-                        .map_err(|e| RegmsgError::BackendError {
-                            backend: "DRM".to_string(),
-                            message: e.to_string(),
-                        })?;
-                    if let Some(crtc_id) = encoder_info.crtc() {
-                        debug!("Fetching CRTC info for ID {:?}", crtc_id);
-                        let crtc_info = card.get_crtc(crtc_id)
+                    let encoder_info =
+                        card.get_encoder(encoder_id)
                             .map_err(|e| RegmsgError::BackendError {
                                 backend: "DRM".to_string(),
                                 message: e.to_string(),
                             })?;
+                    if let Some(crtc_id) = encoder_info.crtc() {
+                        debug!("Fetching CRTC info for ID {:?}", crtc_id);
+                        let crtc_info =
+                            card.get_crtc(crtc_id)
+                                .map_err(|e| RegmsgError::BackendError {
+                                    backend: "DRM".to_string(),
+                                    message: e.to_string(),
+                                })?;
                         if let Some(mode) = crtc_info.mode() {
                             current_mode = Some(DisplayMode {
                                 width: mode.size().0 as u32,
                                 height: mode.size().1 as u32,
                                 refresh_rate: mode.vrefresh() as u32,
-                                name: format!("{}x{}@{}Hz", mode.size().0, mode.size().1, mode.vrefresh()),
+                                name: format!(
+                                    "{}x{}@{}Hz",
+                                    mode.size().0,
+                                    mode.size().1,
+                                    mode.vrefresh()
+                                ),
                             });
                         }
                     }
@@ -273,9 +284,9 @@ impl DisplayBackend for DrmBackend {
 
     fn set_mode(&self, screen: Option<&str>, mode_params: &ModeParams) -> Result<()> {
         let _card = DrmCard::open_available_card()?;
-        
+
         debug!("Iterating over connectors to set display mode");
-        
+
         // Find a matching connector and update it
         self.for_each_connector(screen, |connector_info| {
             // Skip disconnected outputs
@@ -300,20 +311,21 @@ impl DisplayBackend for DrmBackend {
             debug!("Processing connected connector: {}", interface);
 
             // Search for a matching mode with the requested resolution and refresh rate
-            let target_mode = connector_info
-                .modes()
-                .iter()
-                .find(|mode| {
-                    mode.size().0 == mode_params.width as u16
-                        && mode.size().1 == mode_params.height as u16
-                        && mode.vrefresh() == mode_params.refresh_rate as u32
-                });
+            let target_mode = connector_info.modes().iter().find(|mode| {
+                mode.size().0 == mode_params.width as u16
+                    && mode.size().1 == mode_params.height as u16
+                    && mode.vrefresh() == mode_params.refresh_rate as u32
+            });
 
             if let Some(target_mode) = target_mode {
                 // Write the mode string to a system state file (used by some services/tools)
-                let mode_str = format!("{}x{}@{}", mode_params.width, mode_params.height, mode_params.refresh_rate);
-                std::fs::write(DRM_MODE_PATH, &mode_str)
-                    .map_err(|e| RegmsgError::SystemError(format!("Failed to write to DRM mode path: {}", e)))?;
+                let mode_str = format!(
+                    "{}x{}@{}",
+                    mode_params.width, mode_params.height, mode_params.refresh_rate
+                );
+                std::fs::write(DRM_MODE_PATH, &mode_str).map_err(|e| {
+                    RegmsgError::SystemError(format!("Failed to write to DRM mode path: {}", e))
+                })?;
                 debug!("Writing mode string to {}: {}", DRM_MODE_PATH, mode_str);
 
                 info!(
@@ -325,8 +337,10 @@ impl DisplayBackend for DrmBackend {
                     interface
                 );
             } else {
-                warn!("Mode {}x{}@{} not found for output {}", 
-                    mode_params.width, mode_params.height, mode_params.refresh_rate, interface);
+                warn!(
+                    "Mode {}x{}@{} not found for output {}",
+                    mode_params.width, mode_params.height, mode_params.refresh_rate, interface
+                );
             }
 
             Ok(())
@@ -345,10 +359,89 @@ impl DisplayBackend for DrmBackend {
         })
     }
 
-    fn set_max_resolution(&self, _screen: Option<&str>, _max_resolution: Option<&str>) -> Result<()> {
-        info!("TODO: Implement drm_to_max_resolution");
-        // Find and set highest available resolution up to max_resolution
-        Ok(())
+    fn set_max_resolution(&self, screen: Option<&str>, max_resolution: Option<&str>) -> Result<()> {
+        let (max_width, max_height) = match max_resolution {
+            Some(res) => {
+                let parts: Vec<&str> = res.split('x').collect();
+                if parts.len() != 2 {
+                    return Err(RegmsgError::InvalidArguments(format!(
+                        "Invalid resolution format: '{}'. Expected 'WxH'",
+                        res
+                    )));
+                }
+                let width = parts[0].parse::<u32>().map_err(|e| {
+                    RegmsgError::ParseError(format!("Failed to parse width: {}", e))
+                })?;
+                let height = parts[1].parse::<u32>().map_err(|e| {
+                    RegmsgError::ParseError(format!("Failed to parse height: {}", e))
+                })?;
+                if width == 0 || height == 0 {
+                    return Err(RegmsgError::InvalidArguments(format!(
+                        "Resolution dimensions must be positive: {}x{}",
+                        width, height
+                    )));
+                }
+                (width, height)
+            }
+            None => (1920, 1080), // Default to 1920x1080 if no max resolution specified
+        };
+
+        // Find the highest available resolution that doesn't exceed the max resolution
+        let mut best_mode = None;
+        let mut best_area = 0;
+
+        self.for_each_connector(screen, |connector_info| {
+            if connector_info.state() != connector::State::Connected {
+                return Ok(());
+            }
+
+            // If a screen filter is provided, only process matching connector
+            if let Some(screen_name) = screen {
+                if format!("{:?}", connector_info.interface()) != screen_name {
+                    return Ok(());
+                }
+            }
+
+            for mode in connector_info.modes() {
+                let mode_width = mode.size().0 as u32;
+                let mode_height = mode.size().1 as u32;
+
+                // Only consider modes that fit within the max resolution
+                if mode_width <= max_width && mode_height <= max_height {
+                    let area = mode_width * mode_height;
+
+                    // Choose the mode with the largest area (highest resolution within limits)
+                    if area > best_area {
+                        best_area = area;
+                        best_mode = Some((mode_width, mode_height, mode.vrefresh() as u32));
+                    }
+                }
+            }
+            Ok(())
+        })?;
+
+        if let Some((width, height, refresh_rate)) = best_mode {
+            // Write the best mode to the DRM mode path to be used by the hook
+            let mode_str = format!("{}x{}@{}", width, height, refresh_rate);
+            std::fs::write(DRM_MODE_PATH, &mode_str).map_err(|e| {
+                RegmsgError::SystemError(format!("Failed to write to DRM mode path: {}", e))
+            })?;
+
+            info!(
+                "Maximum resolution set to {}x{}@{}Hz for screen: {:?}",
+                width, height, refresh_rate, screen
+            );
+            Ok(())
+        } else {
+            warn!(
+                "No suitable resolution found within {}x{} limits.",
+                max_width, max_height
+            );
+            Err(RegmsgError::NotFound(format!(
+                "No suitable resolution found within {}x{} limits",
+                max_width, max_height
+            )))
+        }
     }
 
     fn take_screenshot(&self, _screenshot_dir: &str) -> Result<String> {

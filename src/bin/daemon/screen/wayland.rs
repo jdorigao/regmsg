@@ -31,7 +31,10 @@ fn format_refresh(refresh: i32) -> String {
 }
 
 /// Filters a collection of outputs based on an optional screen name.
-fn filter_outputs<'a>(outputs: &'a [Output], screen: Option<&str>) -> impl Iterator<Item = &'a Output> {
+fn filter_outputs<'a>(
+    outputs: &'a [Output],
+    screen: Option<&str>,
+) -> impl Iterator<Item = &'a Output> {
     outputs.iter().filter(move |output| {
         screen.map_or(true, |screen_name| {
             let matches = output.name == screen_name;
@@ -107,11 +110,10 @@ impl WaylandBackend {
 
     /// Helper method to get sway connection
     fn get_connection(&self) -> Result<Connection> {
-        Connection::new()
-            .map_err(|e| RegmsgError::BackendError {
-                backend: "Wayland".to_string(),
-                message: format!("Failed to connect to Wayland/Sway: {}", e),
-            })
+        Connection::new().map_err(|e| RegmsgError::BackendError {
+            backend: "Wayland".to_string(),
+            message: format!("Failed to connect to Wayland/Sway: {}", e),
+        })
     }
 }
 
@@ -402,71 +404,73 @@ impl DisplayBackend for WaylandBackend {
                     message: e.to_string(),
                 })?;
 
-        // Determine target output (specified screen or focused output)
-        let target_output = if let Some(screen_name) = screen {
-            filter_outputs(&outputs, Some(screen_name)).next()
-        } else {
-            outputs.iter().find(|output| output.focused)
+        // Determine target output (specified screen or all outputs if no screen specified)
+        let target_outputs: Vec<&Output> = match screen {
+            Some(screen_name) => outputs
+                .iter()
+                .filter(|output| output.name == screen_name)
+                .collect(),
+            None => outputs.iter().collect(),
         };
 
-        if let Some(output) = target_output {
-            if let Some(current_mode) = &output.current_mode {
-                let current_width = current_mode.width as u32;
-                let current_height = current_mode.height as u32;
+        let mut any_success = false;
 
-                // Check if current resolution is already within limits
-                if current_width <= max_width && current_height <= max_height {
-                    info!(
-                        "Current resolution {}x{} is already within limits.",
-                        current_width, current_height
-                    );
-                    return Ok(());
-                }
+        for output in target_outputs {
+            // Find the best mode within the specified limits
+            let best_mode = output
+                .modes
+                .iter()
+                .filter(|mode| mode.width as u32 <= max_width && mode.height as u32 <= max_height)
+                .max_by_key(|mode| {
+                    (mode.width * mode.height) * if mode.refresh > 0 { mode.refresh } else { 1 }
+                }); // Prioritize higher resolution and refresh rate
 
-                // Find the best mode within the specified limits
-                let best_mode = output
-                    .modes
-                    .iter()
-                    .filter(|mode| {
-                        mode.width as u32 <= max_width && mode.height as u32 <= max_height
-                    })
-                    .max_by_key(|mode| (mode.width as u32) * (mode.height as u32));
+            if let Some(mode) = best_mode {
+                let command = format!(
+                    "output {} mode {}x{}@{}Hz",
+                    output.name,
+                    mode.width,
+                    mode.height,
+                    format_refresh(mode.refresh)
+                );
 
-                if let Some(mode) = best_mode {
-                    let command = format!(
-                        "output {} mode {}x{}@{}Hz",
-                        output.name,
-                        mode.width,
-                        mode.height,
-                        format_refresh(mode.refresh)
-                    );
-
-                    for reply in
-                        connection
-                            .run_command(&command)
-                            .map_err(|e| RegmsgError::BackendError {
-                                backend: "Wayland".to_string(),
-                                message: e.to_string(),
-                            })?
-                    {
-                        reply.map_err(|e| RegmsgError::BackendError {
+                let replies =
+                    connection
+                        .run_command(&command)
+                        .map_err(|e| RegmsgError::BackendError {
                             backend: "Wayland".to_string(),
                             message: e.to_string(),
                         })?;
-                    }
-                    info!(
-                        "Resolution set to {}x{} for output '{}'",
-                        mode.width, mode.height, output.name
-                    );
-                    return Ok(());
+
+                for reply in replies {
+                    reply.map_err(|e| RegmsgError::BackendError {
+                        backend: "Wayland".to_string(),
+                        message: e.to_string(),
+                    })?;
                 }
+                info!(
+                    "Resolution set to {}x{}@{}Hz for output '{}'",
+                    mode.width,
+                    mode.height,
+                    format_refresh(mode.refresh),
+                    output.name
+                );
+                any_success = true;
+            } else {
+                warn!(
+                    "No suitable resolution found within {}x{} limits for output '{}'.",
+                    max_width, max_height, output.name
+                );
             }
         }
 
-        warn!(
-            "No suitable resolution found within {}x{} limits.",
-            max_width, max_height
-        );
+        if !any_success && screen.is_some() {
+            return Err(RegmsgError::NotFound(format!(
+                "No suitable resolution found within {}x{} limits for specified screen",
+                max_width, max_height
+            )));
+        }
+
         Ok(())
     }
 
