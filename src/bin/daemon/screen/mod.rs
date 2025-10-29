@@ -380,6 +380,14 @@ impl ScreenService {
 
         // Direct check: if Wayland socket exists, use Wayland backend; otherwise use KMS/DRM
         if Path::new(config::DEFAULT_SWAYSOCK_PATH).exists() {
+            // Set SWAYSOCK environment variable if it doesn't exist
+            if std::env::var("SWAYSOCK").is_err() {
+                unsafe {
+                    std::env::set_var("SWAYSOCK", config::DEFAULT_SWAYSOCK_PATH);
+                }
+                info!("Set SWAYSOCK environment variable to: {}", config::DEFAULT_SWAYSOCK_PATH);
+            }
+            
             // Return a static reference to a Wayland backend instance
             static WAYLAND_BACKEND: std::sync::OnceLock<crate::screen::wayland::WaylandBackend> =
                 std::sync::OnceLock::new();
