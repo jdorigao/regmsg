@@ -12,12 +12,9 @@ use async_std::channel::Receiver;
 use futures::FutureExt;
 use std::fs;
 use std::time::Duration;
+use tracing::{debug, error, info, warn};
 use zeromq::prelude::*;
 use zeromq::{RepSocket, ZmqMessage};
-use tracing::{debug, error, info, warn};
-
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
 
 /// Maximum message size (1MB)
 ///
@@ -64,20 +61,6 @@ impl DaemonServer {
                 .bind(&format!("ipc://{}", config::DEFAULT_SOCKET_PATH))
                 .await
         })?;
-
-        // Set appropriate permissions for the socket (Unix only)
-        #[cfg(unix)]
-        {
-            if let Ok(metadata) = fs::metadata(config::DEFAULT_SOCKET_PATH) {
-                let mut perms = metadata.permissions();
-                perms.set_mode(0o660); // rw-rw---- allows user and group access
-                if let Err(e) = fs::set_permissions(config::DEFAULT_SOCKET_PATH, perms) {
-                    warn!("Failed to set socket permissions: {}", e);
-                } else {
-                    info!("Socket permissions set to 0o660");
-                }
-            }
-        }
 
         // Initialize command registry with all available commands
         let registry = commands::init_commands();
@@ -307,5 +290,3 @@ impl DaemonServer {
         unreachable!()
     }
 }
-
-
