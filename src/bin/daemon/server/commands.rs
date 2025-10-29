@@ -161,6 +161,17 @@ pub fn init_commands() -> CommandRegistry {
         ),
     );
 
+    // Registramos o comando listCommands com descrição fixa,
+    // mas como o registry.list_commands() não é acessível aqui,
+    // o registry já tem um método list_commands() que é usado internamente
+    registry.register(
+        "listCommands",
+        simple_command!("listCommands", "List all available commands", || {
+            // Obtemos a lista de comandos do registry criando um temporário
+            let temp_registry = init_commands();
+            Ok(temp_registry.list_commands())
+        }),
+    );
     registry
 }
 
