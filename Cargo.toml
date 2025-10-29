@@ -11,12 +11,20 @@ keywords = ["display", "resolution", "drm", "sway", "wayland"]
 categories = ["command-line-utilities"]
 
 [dependencies]
-log = "0.4"
-env_logger = "0.11"
+tracing = { version = "0.1", features = ["log"] }
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 signal-hook = "0.3"
 signal-hook-async-std = "0.3"
 futures = "0.3"
 chrono = "0.4"
+thiserror = "2.0"
+toml = "0.9"
+serde_json = "1.0"
+
+[dependencies.serde]
+version = "1.0"
+features = ["derive"]
 
 [dependencies.async-std]
 version = "1.13"
@@ -36,8 +44,11 @@ version = "0.14"
 optional = true
 
 [dependencies.swayipc]
-version = "3.0"
+version = "4.0"
 optional = true
+
+[dev-dependencies]
+tempfile = "3.23"
 
 [features]
 default = ["cli", "daemon"]
@@ -49,7 +60,7 @@ cc = "1.2"
 pkg-config = "0.3"
 
 [profile.release]
-lto = true          # Enable Link Time Optimization for smaller binaries
+lto = "fat"         # Enable Fat Link Time Optimization for maximum optimization
 codegen-units = 1   # Better optimization with single codegen unit
 panic = "abort"     # Smaller binaries by removing panic infrastructure (no backtrace)
 opt-level = 3       # Maximum optimization for performance

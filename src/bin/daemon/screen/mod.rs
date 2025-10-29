@@ -1,37 +1,33 @@
-use log::{debug, error, info};
-use std::path::Path;
+// Import our new architecture modules
+use crate::config;
+use crate::screen::backend::{DisplayBackend, ModeParams};
+use crate::utils::error::{RegmsgError, Result};
 
 // Modules for backend-specific implementations
-mod kmsdrm;
-mod wayland;
+pub mod backend;
+pub mod kmsdrm;
+pub mod wayland;
+
+#[cfg(test)]
+mod screen_tests;
+
+use tracing::{debug, error, info};
 
 /// Represents display mode information including width, height, and refresh rate.
 ///
 /// This struct is used to store parsed display mode details for further processing, such as
 /// setting or querying display configurations.
 #[derive(Debug)]
-struct ModeInfo {
+pub struct ModeInfo {
     width: i32,    // Screen width in pixels
     height: i32,   // Screen height in pixels
     vrefresh: i32, // Refresh rate in Hertz (Hz)
 }
 
-/// Detects the current graphics backend (Wayland or KMS/DRM).
-///
-/// This function checks for the presence of the `WAYLAND_DISPLAY` environment variable
-/// to determine if the system is running Wayland. If not, it defaults to KMS/DRM.
-///
-/// # Returns
-/// A static string indicating the detected backend: "Wayland" or "KMS/DRM".
-fn detect_backend() -> &'static str {
-    if Path::new("/var/run/sway-ipc.0.sock").exists() {
-        info!("Detected Wayland backend.");
-        return "Wayland";
-    } else {
-        info!("Detected KMS/DRM backend.");
-        return "KMS/DRM";
-    }
-}
+/// Service structure that handles all screen operations using the new architecture
+pub struct ScreenService {}
+
+impl ScreenService {}
 
 /// Parses a display mode string in the format "WxH@R" or "WxH".
 ///
@@ -51,22 +47,28 @@ fn detect_backend() -> &'static str {
 /// assert_eq!(mode.height, 1080);
 /// assert_eq!(mode.vrefresh, 60);
 /// ```
-fn parse_mode(mode: &str) -> Result<ModeInfo, Box<dyn std::error::Error>> {
+pub fn parse_mode(mode: &str) -> Result<ModeInfo> {
     debug!("Parsing display mode: {}", mode);
     let parts: Vec<&str> = mode.split(&['x', '@'][..]).collect();
     if parts.len() < 2 || parts.len() > 3 {
         error!("Invalid mode format. Expected 'WxH@R' or 'WxH'.");
-        return Err("Invalid mode format. Use 'WxH@R' or 'WxH'".into());
+        return Err(RegmsgError::InvalidArguments(
+            "Invalid mode format. Use 'WxH@R' or 'WxH'".to_string(),
+        ));
     }
 
     // Parse width and height from the split parts
-    let width = parts[0].parse::<i32>().map_err(|_| "Invalid width")?;
-    let height = parts[1].parse::<i32>().map_err(|_| "Invalid height")?;
+    let width = parts[0]
+        .parse::<i32>()
+        .map_err(|_| RegmsgError::ParseError("Invalid width".to_string()))?;
+    let height = parts[1]
+        .parse::<i32>()
+        .map_err(|_| RegmsgError::ParseError("Invalid height".to_string()))?;
     // Parse refresh rate if provided, otherwise default to 60 Hz
     let vrefresh = if parts.len() == 3 {
         parts[2]
             .parse::<i32>()
-            .map_err(|_| "Invalid refresh rate")?
+            .map_err(|_| RegmsgError::ParseError("Invalid refresh rate".to_string()))?
     } else {
         60 // Default refresh rate if not specified
     };
@@ -90,16 +92,28 @@ fn parse_mode(mode: &str) -> Result<ModeInfo, Box<dyn std::error::Error>> {
 ///
 /// # Returns
 /// A `Result` containing a string with the list of modes, or an error message if the query fails.
-pub fn list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
-    let result = match detect_backend() {
-        "Wayland" => wayland::wayland_list_modes(screen), // Delegate to Wayland-specific implementation
-        "KMS/DRM" => kmsdrm::drm_list_modes(screen), // Delegate to KMS/DRM-specific implementation
-        _ => {
-            debug!("Unknown backend detected.");
-            Ok("Unknown backend. Unable to determine display settings.\n".to_string())
-        }
-    }?;
-    Ok(result)
+pub fn list_modes(screen: Option<&str>) -> Result<String> {
+    let backend = ScreenService::default_backend()?;
+    let modes = backend.list_modes(screen)?;
+
+    let modes_str = modes
+        .iter()
+        .map(|mode| {
+            format!(
+                "{}x{}@{}:{} {}x{}@{}Hz",
+                mode.width,
+                mode.height,
+                mode.refresh_rate,
+                mode.name,
+                mode.width,
+                mode.height,
+                mode.refresh_rate
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Ok(modes_str)
 }
 
 /// Lists available outputs (e.g., HDMI, VGA).
@@ -109,16 +123,17 @@ pub fn list_modes(screen: Option<&str>) -> Result<String, Box<dyn std::error::Er
 ///
 /// # Returns
 /// A `Result` containing a string with the list of outputs, or an error message if the query fails.
-pub fn list_outputs() -> Result<String, Box<dyn std::error::Error>> {
-    let result = match detect_backend() {
-        "Wayland" => wayland::wayland_list_outputs(),
-        "KMS/DRM" => kmsdrm::drm_list_outputs(),
-        _ => {
-            debug!("Unknown backend detected.");
-            Ok("Unknown backend. Unable to determine display settings.\n".to_string())
-        }
-    }?;
-    Ok(result)
+pub fn list_outputs() -> Result<String> {
+    let backend = ScreenService::default_backend()?;
+    let outputs = backend.list_outputs()?;
+
+    let outputs_str = outputs
+        .iter()
+        .map(|output| output.name.clone())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Ok(outputs_str)
 }
 
 /// Displays the current display mode for the specified screen.
@@ -131,16 +146,14 @@ pub fn list_outputs() -> Result<String, Box<dyn std::error::Error>> {
 ///
 /// # Returns
 /// A `Result` containing a string with the current mode, or an error message if the query fails.
-pub fn current_mode(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
-    let result = match detect_backend() {
-        "Wayland" => wayland::wayland_current_mode(screen),
-        "KMS/DRM" => kmsdrm::drm_current_mode(screen),
-        _ => {
-            debug!("Unknown backend detected.");
-            Ok("Unknown backend. Unable to determine display settings.\n".to_string())
-        }
-    }?;
-    Ok(result)
+pub fn current_mode(screen: Option<&str>) -> Result<String> {
+    let backend = ScreenService::default_backend()?;
+    let mode = backend.current_mode(screen)?;
+
+    Ok(format!(
+        "{}x{}@{}",
+        mode.width, mode.height, mode.refresh_rate
+    ))
 }
 
 /// Displays the current output (e.g., HDMI, VGA).
@@ -150,16 +163,17 @@ pub fn current_mode(screen: Option<&str>) -> Result<String, Box<dyn std::error::
 ///
 /// # Returns
 /// A `Result` containing a string with the current output, or an error message if the query fails.
-pub fn current_output() -> Result<String, Box<dyn std::error::Error>> {
-    let result = match detect_backend() {
-        "Wayland" => wayland::wayland_current_output(),
-        "KMS/DRM" => kmsdrm::drm_current_output(),
-        _ => {
-            debug!("Unknown backend detected.");
-            Ok("Unknown backend. Unable to determine display settings.\n".to_string())
-        }
-    }?;
-    Ok(result)
+pub fn current_output() -> Result<String> {
+    let backend = ScreenService::default_backend()?;
+    let outputs = backend.list_outputs()?;
+
+    let active_output = outputs
+        .iter()
+        .find(|output| output.is_connected && output.current_mode.is_some())
+        .map(|output| output.name.clone())
+        .unwrap_or_else(|| "No active output".to_string());
+
+    Ok(active_output)
 }
 
 /// Displays the current resolution for the specified screen.
@@ -172,16 +186,11 @@ pub fn current_output() -> Result<String, Box<dyn std::error::Error>> {
 ///
 /// # Returns
 /// A `Result` containing a string with the current resolution, or an error message if the query fails.
-pub fn current_resolution(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
-    let result = match detect_backend() {
-        "Wayland" => wayland::wayland_current_resolution(screen),
-        "KMS/DRM" => kmsdrm::drm_current_resolution(screen),
-        _ => {
-            debug!("Unknown backend detected.");
-            Ok("Unknown backend. Unable to determine display settings.\n".to_string())
-        }
-    }?;
-    Ok(result)
+pub fn current_resolution(screen: Option<&str>) -> Result<String> {
+    let backend = ScreenService::default_backend()?;
+    let (width, height) = backend.current_resolution(screen)?;
+
+    Ok(format!("{}x{}", width, height))
 }
 
 /// Displays the current refresh rate for the specified screen.
@@ -194,16 +203,11 @@ pub fn current_resolution(screen: Option<&str>) -> Result<String, Box<dyn std::e
 ///
 /// # Returns
 /// A `Result` containing a string with the current refresh rate, or an error message if the query fails.
-pub fn current_refresh(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
-    let result = match detect_backend() {
-        "Wayland" => wayland::wayland_current_refresh(screen),
-        "KMS/DRM" => kmsdrm::drm_current_refresh(screen),
-        _ => {
-            debug!("Unknown backend detected.");
-            Ok("Unknown backend. Unable to determine display settings.\n".to_string())
-        }
-    }?;
-    Ok(result)
+pub fn current_refresh(screen: Option<&str>) -> Result<String> {
+    let backend = ScreenService::default_backend()?;
+    let refresh_rate = backend.current_refresh_rate(screen)?;
+
+    Ok(format!("{}Hz", refresh_rate))
 }
 
 /// Displays the current rotation for the specified screen.
@@ -216,16 +220,11 @@ pub fn current_refresh(screen: Option<&str>) -> Result<String, Box<dyn std::erro
 ///
 /// # Returns
 /// A `Result` containing a string with the current rotation, or an error message if the query fails.
-pub fn current_rotation(screen: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
-    let result = match detect_backend() {
-        "Wayland" => wayland::wayland_current_rotation(screen),
-        "KMS/DRM" => kmsdrm::drm_current_rotation(screen),
-        _ => {
-            debug!("Unknown backend detected.");
-            Ok("Unknown backend. Unable to determine display settings.\n".to_string())
-        }
-    }?;
-    Ok(result)
+pub fn current_rotation(screen: Option<&str>) -> Result<String> {
+    let backend = ScreenService::default_backend()?;
+    let rotation = backend.current_rotation(screen)?;
+
+    Ok(rotation.to_string())
 }
 
 /// Sets the display mode for the specified screen.
@@ -239,34 +238,20 @@ pub fn current_rotation(screen: Option<&str>) -> Result<String, Box<dyn std::err
 ///
 /// # Returns
 /// A `Result` indicating success or an error message if the operation fails.
-pub fn set_mode(screen: Option<&str>, mode: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn set_mode(screen: Option<&str>, mode: &str) -> Result<()> {
+    let backend = ScreenService::default_backend()?;
+
     if mode.starts_with("max-") {
-        let max_resolution = mode.trim_start_matches("max-").to_string();
-        match detect_backend() {
-            "Wayland" => wayland::wayland_min_to_max_resolution(screen, Some(max_resolution))?,
-            "KMS/DRM" => kmsdrm::drm_to_max_resolution(screen, Some(max_resolution))?,
-            _ => {
-                debug!("Unknown backend detected.");
-                println!("Unknown backend. Unable to determine display settings.");
-            }
-        }
+        let max_resolution = mode.trim_start_matches("max-");
+        backend.set_max_resolution(screen, Some(max_resolution))?;
     } else {
-        let mode_set = parse_mode(mode)?; // Parse the mode string into components
-        match detect_backend() {
-            "Wayland" => wayland::wayland_set_mode(
-                screen,
-                mode_set.width,
-                mode_set.height,
-                mode_set.vrefresh,
-            )?,
-            "KMS/DRM" => {
-                kmsdrm::drm_set_mode(screen, mode_set.width, mode_set.height, mode_set.vrefresh)?
-            }
-            _ => {
-                debug!("Unknown backend detected.");
-                println!("Unknown backend. Unable to determine display settings.");
-            }
-        }
+        let mode_info = parse_mode(mode)?;
+        let mode_params = ModeParams {
+            width: mode_info.width as u32,
+            height: mode_info.height as u32,
+            refresh_rate: mode_info.vrefresh as u32,
+        };
+        backend.set_mode(screen, &mode_params)?;
     }
     Ok(())
 }
@@ -280,15 +265,17 @@ pub fn set_mode(screen: Option<&str>, mode: &str) -> Result<(), Box<dyn std::err
 ///
 /// # Returns
 /// A `Result` indicating success or an error message if the operation fails.
-pub fn set_output(output: &str) -> Result<(), Box<dyn std::error::Error>> {
-    match detect_backend() {
-        "Wayland" => wayland::wayland_set_output(output)?,
-        "KMS/DRM" => kmsdrm::drm_set_output(output)?,
-        _ => {
-            debug!("Unknown backend detected.");
-            println!("Unknown backend. Unable to determine display settings.");
-        }
-    }
+pub fn set_output(output: &str) -> Result<()> {
+    let backend = ScreenService::default_backend()?;
+    let mode_info = parse_mode(output)?;
+    let mode_params = ModeParams {
+        width: mode_info.width as u32,
+        height: mode_info.height as u32,
+        refresh_rate: mode_info.vrefresh as u32,
+    };
+
+    // Apply to all connected outputs without specifying a screen
+    backend.set_mode(None, &mode_params)?;
     Ok(())
 }
 
@@ -303,18 +290,29 @@ pub fn set_output(output: &str) -> Result<(), Box<dyn std::error::Error>> {
 ///
 /// # Returns
 /// A `Result` indicating success or an error message if the operation fails.
-pub fn set_rotation(
-    screen: Option<&str>,
-    rotation: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    match detect_backend() {
-        "Wayland" => wayland::wayland_set_rotation(screen, rotation)?,
-        "KMS/DRM" => kmsdrm::drm_set_rotation(screen, rotation)?,
-        _ => {
-            debug!("Unknown backend detected.");
-            println!("Unknown backend. Unable to determine display settings.");
-        }
+pub fn set_rotation(screen: Option<&str>, rotation: &str) -> Result<()> {
+    let backend = ScreenService::default_backend()?;
+
+    // Validate rotation value
+    let rotation_value = rotation.parse::<u32>().map_err(|_| {
+        RegmsgError::InvalidArguments(format!(
+            "Invalid rotation: '{}'. Must be a number",
+            rotation
+        ))
+    })?;
+
+    if ![0, 90, 180, 270].contains(&rotation_value) {
+        return Err(RegmsgError::InvalidArguments(
+            "Rotation must be one of: 0, 90, 180, 270".to_string(),
+        ));
     }
+
+    use crate::screen::backend::RotationParams;
+    let rotation_params = RotationParams {
+        rotation: rotation_value,
+    };
+
+    backend.set_rotation(screen, &rotation_params)?;
     Ok(())
 }
 
@@ -325,16 +323,11 @@ pub fn set_rotation(
 ///
 /// # Returns
 /// A `Result` indicating success or an error message if the operation fails.
-pub fn get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
-    let screenshot_dir = "/userdata/screenshots";
-    match detect_backend() {
-        "Wayland" => wayland::wayland_get_screenshot(screenshot_dir)?,
-        "KMS/DRM" => kmsdrm::drm_get_screenshot(screenshot_dir)?,
-        _ => {
-            debug!("Unknown backend detected.");
-            println!("Unknown backend. Unable to determine display settings.");
-        }
-    }
+pub fn get_screenshot() -> Result<()> {
+    let backend = ScreenService::default_backend()?;
+
+    let filepath = backend.take_screenshot(config::DEFAULT_SCREENSHOT_DIR)?;
+    info!("Screenshot saved to: {}", filepath);
     Ok(())
 }
 
@@ -345,18 +338,9 @@ pub fn get_screenshot() -> Result<(), Box<dyn std::error::Error>> {
 ///
 /// # Returns
 /// A `Result` indicating success or an error message if the operation fails.
-pub fn map_touch_screen() -> Result<(), Box<dyn std::error::Error>> {
-    match detect_backend() {
-        "Wayland" => wayland::wayland_map_touch_screen()?,
-        "KMS/DRM" => {
-            debug!("No touchscreen support for KMS/DRM.");
-            println!("No touchscreen support.");
-        }
-        _ => {
-            debug!("Unknown backend detected.");
-            println!("Unknown backend. Unable to determine display settings.");
-        }
-    }
+pub fn map_touch_screen() -> Result<()> {
+    let backend = ScreenService::default_backend()?;
+    backend.map_touchscreen()?;
     Ok(())
 }
 
@@ -370,30 +354,52 @@ pub fn map_touch_screen() -> Result<(), Box<dyn std::error::Error>> {
 ///
 /// # Returns
 /// A `Result` indicating success or an error message if the operation fails.
-pub fn min_to_max_resolution(screen: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
-    // Default maximum resolution if not overridden elsewhere
-    let max_resolution = "1920x1080".to_string();
-
-    match detect_backend() {
-        "Wayland" => wayland::wayland_min_to_max_resolution(screen, Some(max_resolution))?,
-        "KMS/DRM" => kmsdrm::drm_to_max_resolution(screen, Some(max_resolution))?,
-        _ => {
-            debug!("Unknown backend detected.");
-            println!("Unknown backend. Unable to determine display settings.");
-        }
-    }
+pub fn min_to_max_resolution(screen: Option<&str>) -> Result<()> {
+    let backend = ScreenService::default_backend()?;
+    // Default maximum resolution
+    backend.set_max_resolution(screen, Some(config::DEFAULT_MAX_RESOLUTION))?;
     Ok(())
 }
 
 /// Retrieves the currently detected graphics backend.
 ///
-/// This function calls `detect_backend()` and returns the result as a string.
-/// The backend name is also printed to the console.
+/// This function calls the backend manager and returns the result as a string.
 ///
 /// # Returns
 /// A `Result` containing the detected backend as a string ("Wayland" or "KMS/DRM"),
 /// or an error message if the operation fails.
-pub fn current_backend() -> Result<String, Box<dyn std::error::Error>> {
-    let backend = detect_backend();
-    Ok(backend.to_string())
+pub fn current_backend() -> Result<String> {
+    let backend = ScreenService::default_backend()?;
+    Ok(backend.backend_name().to_string())
+}
+
+impl ScreenService {
+    /// Gets a reference to the active backend (helper for current functions)
+    fn default_backend() -> Result<&'static dyn DisplayBackend> {
+        use std::path::Path;
+
+        // Direct check: if Wayland socket exists, use Wayland backend; otherwise use KMS/DRM
+        if Path::new(config::DEFAULT_SWAYSOCK_PATH).exists() {
+            // Set SWAYSOCK environment variable if it doesn't exist
+            if std::env::var("SWAYSOCK").is_err() {
+                unsafe {
+                    std::env::set_var("SWAYSOCK", config::DEFAULT_SWAYSOCK_PATH);
+                }
+                info!("Set SWAYSOCK environment variable to: {}", config::DEFAULT_SWAYSOCK_PATH);
+            }
+            
+            // Return a static reference to a Wayland backend instance
+            static WAYLAND_BACKEND: std::sync::OnceLock<crate::screen::wayland::WaylandBackend> =
+                std::sync::OnceLock::new();
+            let backend =
+                WAYLAND_BACKEND.get_or_init(|| crate::screen::wayland::WaylandBackend::new());
+            Ok(backend)
+        } else {
+            // Return a static reference to a DRM backend instance
+            static DRM_BACKEND: std::sync::OnceLock<crate::screen::kmsdrm::DrmBackend> =
+                std::sync::OnceLock::new();
+            let backend = DRM_BACKEND.get_or_init(|| crate::screen::kmsdrm::DrmBackend::new());
+            Ok(backend)
+        }
+    }
 }

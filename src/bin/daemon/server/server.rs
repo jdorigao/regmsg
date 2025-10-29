@@ -7,21 +7,14 @@
 
 use super::command_registry::{CommandError, CommandRegistry};
 use super::commands;
+use crate::config;
 use async_std::channel::Receiver;
 use futures::FutureExt;
-use log::{debug, error, info, warn};
 use std::fs;
 use std::time::Duration;
+use tracing::{debug, error, info, warn};
 use zeromq::prelude::*;
 use zeromq::{RepSocket, ZmqMessage};
-
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
-
-/// Path for the daemon socket
-///
-/// This is the IPC socket path used for communication between clients and the daemon.
-const SOCKET_PATH: &str = "/var/run/regmsgd.sock";
 
 /// Maximum message size (1MB)
 ///
@@ -57,29 +50,17 @@ impl DaemonServer {
     /// * `Result<DaemonServer, Box<dyn std::error::Error>>` - A new daemon server instance or an error
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         // Remove existing socket if present
-        let _ = fs::remove_file(SOCKET_PATH);
+        let _ = fs::remove_file(config::DEFAULT_SOCKET_PATH);
 
         let mut socket = RepSocket::new();
 
         // Use blocking operation for bind to ensure it completes
         async_std::task::block_on(async {
-            info!("Binding socket to ipc://{}", SOCKET_PATH);
-            socket.bind(&format!("ipc://{}", SOCKET_PATH)).await
+            info!("Binding socket to ipc://{}", config::DEFAULT_SOCKET_PATH);
+            socket
+                .bind(&format!("ipc://{}", config::DEFAULT_SOCKET_PATH))
+                .await
         })?;
-
-        // Set appropriate permissions for the socket (Unix only)
-        #[cfg(unix)]
-        {
-            if let Ok(metadata) = fs::metadata(SOCKET_PATH) {
-                let mut perms = metadata.permissions();
-                perms.set_mode(0o660); // rw-rw---- allows user and group access
-                if let Err(e) = fs::set_permissions(SOCKET_PATH, perms) {
-                    warn!("Failed to set socket permissions: {}", e);
-                } else {
-                    info!("Socket permissions set to 0o660");
-                }
-            }
-        }
 
         // Initialize command registry with all available commands
         let registry = commands::init_commands();
@@ -88,7 +69,10 @@ impl DaemonServer {
             registry.list_commands().lines().count()
         );
 
-        info!("Daemon server initialized on ipc://{}", SOCKET_PATH);
+        info!(
+            "Daemon server initialized on ipc://{}",
+            config::DEFAULT_SOCKET_PATH
+        );
 
         Ok(DaemonServer { socket, registry })
     }
@@ -102,10 +86,17 @@ impl DaemonServer {
     /// * `Result<(), Box<dyn std::error::Error>>` - Ok if shutdown succeeds, or an error
     pub async fn shutdown(self) -> Result<(), Box<dyn std::error::Error>> {
         info!("Initiating graceful shutdown of daemon server");
-        if let Err(e) = fs::remove_file(SOCKET_PATH) {
-            warn!("Failed to remove socket file {}: {}", SOCKET_PATH, e);
+        if let Err(e) = fs::remove_file(config::DEFAULT_SOCKET_PATH) {
+            warn!(
+                "Failed to remove socket file {}: {}",
+                config::DEFAULT_SOCKET_PATH,
+                e
+            );
         } else {
-            info!("Socket file {} removed successfully", SOCKET_PATH);
+            info!(
+                "Socket file {} removed successfully",
+                config::DEFAULT_SOCKET_PATH
+            );
         }
         Ok(())
     }
@@ -297,34 +288,5 @@ impl DaemonServer {
             }
         }
         unreachable!()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use zeromq::ZmqMessage;
-
-    #[test]
-    fn test_extract_command() {
-        let server = DaemonServer {
-            socket: RepSocket::new(),
-            registry: crate::server::commands::init_commands(),
-        };
-        let msg = ZmqMessage::from("test command");
-        let result = server.extract_command(&msg);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "test command");
-    }
-
-    #[test]
-    fn test_format_response() {
-        let server = DaemonServer {
-            socket: RepSocket::new(),
-            registry: crate::server::commands::init_commands(),
-        };
-        let result = Ok("success".to_string());
-        let response = server.format_response(result);
-        assert_eq!(response, "success");
     }
 }

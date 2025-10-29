@@ -26,7 +26,7 @@ pub fn init_commands() -> CommandRegistry {
     registry.register(
         "listOutputs",
         simple_command!("listOutputs", "List all available display outputs", || {
-            screen::list_outputs()
+            Ok(screen::list_outputs()?)
         }),
     );
 
@@ -35,7 +35,7 @@ pub fn init_commands() -> CommandRegistry {
         simple_command!(
             "currentOutput",
             "Displays the current output (e.g., HDMI, VGA)",
-            || screen::current_output()
+            || Ok(screen::current_output()?)
         ),
     );
 
@@ -44,7 +44,7 @@ pub fn init_commands() -> CommandRegistry {
         simple_command!(
             "currentBackend",
             "Displays the current window system",
-            || screen::current_backend()
+            || Ok(screen::current_backend()?)
         ),
     );
 
@@ -76,7 +76,7 @@ pub fn init_commands() -> CommandRegistry {
     registry.register(
         "listModes",
         screen_command("Lists all available outputs (e.g., HDMI, VGA)", |screen| {
-            screen::list_modes(screen)
+            Ok(screen::list_modes(screen)?)
         }),
     );
 
@@ -84,7 +84,7 @@ pub fn init_commands() -> CommandRegistry {
         "currentMode",
         screen_command(
             "Displays the current display mode for the specified screen",
-            |screen| screen::current_mode(screen),
+            |screen| Ok(screen::current_mode(screen)?),
         ),
     );
 
@@ -92,7 +92,7 @@ pub fn init_commands() -> CommandRegistry {
         "currentResolution",
         screen_command(
             "Displays the current resolution for the specified screen",
-            |screen| screen::current_resolution(screen),
+            |screen| Ok(screen::current_resolution(screen)?),
         ),
     );
 
@@ -100,7 +100,7 @@ pub fn init_commands() -> CommandRegistry {
         "currentRotation",
         screen_command(
             "Displays the current screen rotation for the specified screen",
-            |screen| screen::current_rotation(screen),
+            |screen| Ok(screen::current_rotation(screen)?),
         ),
     );
 
@@ -108,7 +108,7 @@ pub fn init_commands() -> CommandRegistry {
         "currentRefresh",
         screen_command(
             "Displays the current refresh rate for the specified screen",
-            |screen| screen::current_refresh(screen),
+            |screen| Ok(screen::current_refresh(screen)?),
         ),
     );
 
@@ -128,7 +128,7 @@ pub fn init_commands() -> CommandRegistry {
         "setMode",
         screen_setter_command(
             "Sets the display mode for the specified screen (e.g., 1920x1080@60)",
-            |screen, mode| screen::set_mode(screen, mode),
+            |screen, mode| Ok(screen::set_mode(screen, mode)?),
         ),
     );
 
@@ -139,7 +139,7 @@ pub fn init_commands() -> CommandRegistry {
             description: "Sets the output resolution and refresh rate (e.g., WxH@R or WxH)"
                 .to_string(),
             expected_args: 1,
-            executor: Box::new(|args| screen::set_output(args[0])),
+            executor: Box::new(|args| Ok(screen::set_output(args[0])?)),
         }),
     );
 
@@ -156,7 +156,7 @@ pub fn init_commands() -> CommandRegistry {
                     )
                     .into());
                 }
-                screen::set_rotation(screen, rotation)
+                Ok(screen::set_rotation(screen, rotation)?)
             },
         ),
     );
@@ -164,29 +164,4 @@ pub fn init_commands() -> CommandRegistry {
     registry
 }
 
-/// Test module for commands functionality
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    /// Test that key commands are properly registered
-    #[test]
-    fn test_commands_registered() {
-        let registry = init_commands();
-
-        // Test that key commands are registered
-        let commands = registry.list_commands();
-        assert!(commands.contains("listModes"));
-        assert!(commands.contains("currentMode"));
-        assert!(commands.contains("setMode"));
-        assert!(commands.contains("setRotation"));
-    }
-
-    /// Test that invalid rotation values are properly rejected
-    #[test]
-    fn test_invalid_rotation() {
-        let registry = init_commands();
-        let result = registry.handle("setRotation 45");
-        assert!(result.is_err());
-    }
-}

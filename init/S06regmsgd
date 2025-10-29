@@ -1,0 +1,133 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          regmsgd
+# Required-Start:    $local_fs $network
+# Required-Stop:     $local_fs $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: REG Linux message daemon
+# Description:       Daemon handling REG Linux messaging system
+### END INIT INFO
+
+# Configuration variables
+DAEMON=/usr/bin/regmsgd
+DAEMON_NAME=regmsgd
+PIDFILE=/var/run/$DAEMON_NAME.pid
+DAEMON_OPTS=""
+USER=root
+TIMEOUT=60  # Maximum time to start/stop the daemon (in seconds)
+
+# Exit immediately if a command exits with a non-zero status
+set -e
+
+# Function to check if the daemon exists
+check_daemon_exists() {
+    if [ ! -x "$DAEMON" ]; then
+        echo "Error: The daemon $DAEMON does not exist or is not executable."
+        exit 1
+    fi
+}
+
+# Function to check if the user exists
+check_user_exists() {
+    if ! id "$USER" >/dev/null 2>&1; then
+        echo "Error: The user $USER does not exist."
+        exit 1
+    fi
+}
+
+# Function to check if the daemon is already running
+is_daemon_running() {
+    if [ -f "$PIDFILE" ]; then
+        # Check if the PID in the file is still running
+        if kill -0 "$(cat "$PIDFILE" 2>/dev/null)" 2>/dev/null; then
+            return 0  # Daemon is running
+        else
+            # PID file exists, but the process is not running. Remove the file.
+            rm -f "$PIDFILE"
+            return 1  # Daemon is not running
+        fi
+    fi
+    return 1  # Daemon is not running
+}
+
+start() {
+    if is_daemon_running; then
+        echo "$DAEMON_NAME is already running."
+        return 0
+    fi
+
+    check_daemon_exists
+    check_user_exists
+
+    echo "Starting $DAEMON_NAME..."
+
+    # Starts the daemon with start-stop-daemon
+    start-stop-daemon --start --quiet --background \
+        --make-pidfile --pidfile "$PIDFILE" \
+        --exec "$DAEMON" --chuid "$USER" -- $DAEMON_OPTS
+
+    # Waits for the daemon to start (with timeout)
+    local count=0
+    while [ $count -lt $TIMEOUT ] && ! is_daemon_running; do
+        sleep 1
+        count=$((count + 1))
+    done
+
+    if is_daemon_running; then
+        echo "$DAEMON_NAME started."
+    else
+        echo "Error: Failed to start $DAEMON_NAME within the timeout ($TIMEOUT seconds)."
+        exit 1
+    fi
+}
+
+stop() {
+    if ! is_daemon_running; then
+        echo "$DAEMON_NAME is not running."
+        return 0
+    fi
+
+    echo "Stopping $DAEMON_NAME..."
+
+    # Stops the daemon with start-stop-daemon
+    start-stop-daemon --stop --quiet --pidfile "$PIDFILE" --retry TERM/$TIMEOUT/KILL/5
+    RETVAL=$?
+
+    if [ $RETVAL = 0 ]; then
+        rm -f "$PIDFILE"
+        echo "$DAEMON_NAME stopped."
+    else
+        echo "Error: Failed to stop $DAEMON_NAME."
+        exit 1
+    fi
+}
+
+restart() {
+    echo "Restarting $DAEMON_NAME..."
+    stop
+    sleep 1  # Wait one second before starting
+    start
+}
+
+status() {
+    if is_daemon_running; then
+        echo "$DAEMON_NAME is running (PID: $(cat "$PIDFILE" 2>/dev/null))."
+    else
+        echo "$DAEMON_NAME is not running."
+    fi
+}
+
+# Argument validation
+case "$1" in
+    start|stop|restart|status)
+        # Calls the corresponding function
+        $1
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status}"
+        exit 1
+        ;;
+esac
+
+exit 0

@@ -17,3 +17,7 @@ pub mod commands;
 
 /// Server module - implements the ZeroMQ communication layer and message handling
 pub mod server;
+
+/// Server tests module - contains comprehensive tests for the server components
+#[cfg(test)]
+mod server_tests;
