@@ -5,6 +5,7 @@
 //! providing a clean interface between the ZeroMQ server and screen management functions.
 
 use super::command_registry::{CommandRegistry, screen_command, screen_setter_command};
+use crate::controller;
 use crate::screen;
 use crate::simple_command;
 
@@ -22,7 +23,18 @@ use crate::simple_command;
 pub fn init_commands() -> CommandRegistry {
     let mut registry = CommandRegistry::new();
 
-    // Query commands (no arguments) - Commands that return information about the system
+    registry.register(
+        "listCommands",
+        simple_command!("listCommands", "List all available commands", || {
+            let temp_registry = init_commands();
+            Ok(temp_registry.list_commands())
+        }),
+    );
+
+    // ----------------------------------------------
+    // Screen management commands
+    // ----------------------------------------------
+
     registry.register(
         "listOutputs",
         simple_command!("listOutputs", "List all available display outputs", || {
@@ -72,7 +84,6 @@ pub fn init_commands() -> CommandRegistry {
         ),
     );
 
-    // Screen-aware query commands - Commands that can operate on a specific screen
     registry.register(
         "listModes",
         screen_command("Lists all available outputs (e.g., HDMI, VGA)", |screen| {
@@ -123,7 +134,6 @@ pub fn init_commands() -> CommandRegistry {
         ),
     );
 
-    // Setter commands (with arguments) - Commands that modify system settings
     registry.register(
         "setMode",
         screen_setter_command(
@@ -161,18 +171,70 @@ pub fn init_commands() -> CommandRegistry {
         ),
     );
 
-    // Registramos o comando listCommands com descrição fixa,
-    // mas como o registry.list_commands() não é acessível aqui,
-    // o registry já tem um método list_commands() que é usado internamente
+    // ----------------------------------------------
+    // Controller management commands
+    // ----------------------------------------------
+
     registry.register(
-        "listCommands",
-        simple_command!("listCommands", "List all available commands", || {
-            // Obtemos a lista de comandos do registry criando um temporário
-            let temp_registry = init_commands();
-            Ok(temp_registry.list_commands())
+        "addController",
+        Box::new(super::command_registry::ArgCommand {
+            name: "addController".to_string(),
+            description: "Adds controller to the system (single GUID at a time)".to_string(),
+            expected_args: 1,
+            executor: Box::new(|args| {
+                let guid = args[0].trim();
+
+                if guid.is_empty() {
+                    return Err("GUID cannot be empty.".into());
+                }
+
+                let _ = controller::add_controller(guid)?;
+                Ok(())
+            }),
         }),
     );
+
+    registry.register(
+        "removeController",
+        Box::new(super::command_registry::ArgCommand {
+            name: "removeController".to_string(),
+            description: "Remove controller. Specify 1 GUID to remove a specific controller"
+                .to_string(),
+            expected_args: 1, // Must have exactly 1 arg
+            executor: Box::new(|args| {
+                // Must have exactly 1 argument
+                if args.len() != 1 {
+                    return Err("Expected exactly 1 controller GUID.".into());
+                }
+
+                let guid = args[0].trim();
+
+                if guid.is_empty() {
+                    return Err("GUID cannot be empty.".into());
+                }
+
+                controller::remove_controller(guid)?;
+
+                // Return success regardless of whether controllers were found
+                Ok(())
+            }),
+        }),
+    );
+
+    registry.register(
+        "getController",
+        simple_command!("getController", "Get all controller configurations", || {
+            let controllers_json = controller::get_controller()?;
+
+            // Check if the JSON indicates no controllers
+            let result = if controllers_json == "{}" {
+                "No controllers configured".to_string()
+            } else {
+                controllers_json
+            };
+            Ok(result)
+        }),
+    );
+
     registry
 }
-
-
