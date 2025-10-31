@@ -359,7 +359,11 @@ impl DisplayBackend for DrmBackend {
         })
     }
 
-    fn set_max_resolution(&self, screen: Option<&str>, max_resolution: Option<&str>) -> Result<()> {
+    fn min_to_max_resolution(
+        &self,
+        screen: Option<&str>,
+        max_resolution: Option<&str>,
+    ) -> Result<()> {
         let (max_width, max_height) = match max_resolution {
             Some(res) => {
                 let parts: Vec<&str> = res.split('x').collect();
