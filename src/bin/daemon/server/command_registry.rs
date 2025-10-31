@@ -206,7 +206,7 @@ macro_rules! arg_command {
 /// Simple command handler (no arguments)
 ///
 /// Handles commands that take no arguments and return a string result.
-/// These commands execute a function that returns a Result<String, Box<dyn Error>>.
+/// These commands execute a function that returns a `Result<String, Box<dyn std::error::Error>>`.
 pub struct SimpleCommand {
     pub description: String,
     pub executor: Box<dyn Fn() -> Result<String, Box<dyn std::error::Error>> + Send + Sync>,
@@ -232,7 +232,7 @@ impl CommandHandler for SimpleCommand {
 /// Command handler with arguments
 ///
 /// Handles commands that take a specific number of arguments and return a unit result.
-/// The executor function returns Result<(), Box<dyn Error>>, and the handler returns
+/// The executor function returns `Result<(), Box<dyn std::error::Error>>`, and the handler returns
 /// a success message on completion.
 pub struct ArgCommand {
     pub name: String,

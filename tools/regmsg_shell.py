@@ -125,8 +125,10 @@ class RegmsgShell:
 
         while True:
             try:
-                # Show timestamp in prompt
-                prompt = f"[{datetime.now().strftime('%H:%M:%S')}]> "
+                import socket
+
+                # Show hostname in prompt
+                prompt = f"🎮 [{socket.gethostname()}]> "
                 cmd = input(prompt).strip()
 
                 if not cmd:
