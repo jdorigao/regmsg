@@ -66,7 +66,11 @@ pub trait DisplayBackend: Send + Sync {
     fn set_rotation(&self, screen: Option<&str>, rotation: &RotationParams) -> Result<()>;
 
     /// Sets the maximum resolution for a specific output
-    fn set_max_resolution(&self, screen: Option<&str>, max_resolution: Option<&str>) -> Result<()>;
+    fn min_to_max_resolution(
+        &self,
+        screen: Option<&str>,
+        max_resolution: Option<&str>,
+    ) -> Result<()>;
 
     /// Takes a screenshot
     fn take_screenshot(&self, screenshot_dir: &str) -> Result<String>;

@@ -359,7 +359,11 @@ impl DisplayBackend for DrmBackend {
         })
     }
 
-    fn set_max_resolution(&self, screen: Option<&str>, max_resolution: Option<&str>) -> Result<()> {
+    fn min_to_max_resolution(
+        &self,
+        screen: Option<&str>,
+        max_resolution: Option<&str>,
+    ) -> Result<()> {
         let (max_width, max_height) = match max_resolution {
             Some(res) => {
                 let parts: Vec<&str> = res.split('x').collect();
@@ -385,6 +389,45 @@ impl DisplayBackend for DrmBackend {
             }
             None => (1920, 1080), // Default to 1920x1080 if no max resolution specified
         };
+
+        let max_area = max_width * max_height;
+
+        // First, check the current mode of the target screen(s) to see if it exceeds the limit
+        let current_mode = self.current_mode(screen).ok(); // Use ok() to convert Result to Option
+        let should_proceed = if let Some(current_mode) = current_mode {
+            let current_area = current_mode.width * current_mode.height;
+            debug!(
+                "Current resolution {}x{} (area: {}) for screen '{:?}' vs max limit {}x{} (area: {}).",
+                current_mode.width,
+                current_mode.height,
+                current_area,
+                screen,
+                max_width,
+                max_height,
+                max_area
+            );
+            current_area > max_area
+        } else {
+            // If current mode cannot be determined, it's safer to proceed with the limit check
+            debug!(
+                "Could not determine current mode for screen '{:?}'. Proceeding with mode selection within limits.",
+                screen
+            );
+            true // Assume we need to check, as current mode is unknown
+        };
+
+        if !should_proceed {
+            debug!(
+                "Current resolution for screen '{:?}' is already within the maximum allowed limits. No change needed.",
+                screen
+            );
+            return Ok(()); // Exit early if no change is needed
+        }
+
+        debug!(
+            "Current resolution for screen '{:?}' exceeds the maximum allowed limits. Finding best mode within limits.",
+            screen
+        );
 
         // Find the highest available resolution that doesn't exceed the max resolution
         let mut best_mode = None;

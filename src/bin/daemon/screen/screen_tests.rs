@@ -117,7 +117,7 @@ impl DisplayBackend for MockDrmBackend {
         Ok(())
     }
 
-    fn set_max_resolution(
+    fn min_to_max_resolution(
         &self,
         _screen: Option<&str>,
         _max_resolution: Option<&str>,
@@ -211,7 +211,7 @@ impl DisplayBackend for MockWaylandBackend {
         Ok(())
     }
 
-    fn set_max_resolution(
+    fn min_to_max_resolution(
         &self,
         _screen: Option<&str>,
         _max_resolution: Option<&str>,
@@ -400,8 +400,6 @@ fn test_mode_with_zero_values() {
     assert_eq!(mode_info.height, 0);
     assert_eq!(mode_info.vrefresh, 0);
 }
-
-
 
 // Tests for mode parsing functionality
 #[cfg(test)]

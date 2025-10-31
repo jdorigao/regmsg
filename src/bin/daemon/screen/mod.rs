@@ -243,7 +243,7 @@ pub fn set_mode(screen: Option<&str>, mode: &str) -> Result<()> {
 
     if mode.starts_with("max-") {
         let max_resolution = mode.trim_start_matches("max-");
-        backend.set_max_resolution(screen, Some(max_resolution))?;
+        backend.min_to_max_resolution(screen, Some(max_resolution))?;
     } else {
         let mode_info = parse_mode(mode)?;
         let mode_params = ModeParams {
@@ -357,7 +357,7 @@ pub fn map_touch_screen() -> Result<()> {
 pub fn min_to_max_resolution(screen: Option<&str>) -> Result<()> {
     let backend = ScreenService::default_backend()?;
     // Default maximum resolution
-    backend.set_max_resolution(screen, Some(config::DEFAULT_MAX_RESOLUTION))?;
+    backend.min_to_max_resolution(screen, Some(config::DEFAULT_MAX_RESOLUTION))?;
     Ok(())
 }
 
@@ -385,9 +385,12 @@ impl ScreenService {
                 unsafe {
                     std::env::set_var("SWAYSOCK", config::DEFAULT_SWAYSOCK_PATH);
                 }
-                info!("Set SWAYSOCK environment variable to: {}", config::DEFAULT_SWAYSOCK_PATH);
+                info!(
+                    "Set SWAYSOCK environment variable to: {}",
+                    config::DEFAULT_SWAYSOCK_PATH
+                );
             }
-            
+
             // Return a static reference to a Wayland backend instance
             static WAYLAND_BACKEND: std::sync::OnceLock<crate::screen::wayland::WaylandBackend> =
                 std::sync::OnceLock::new();
