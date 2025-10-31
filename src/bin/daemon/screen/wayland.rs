@@ -399,6 +399,8 @@ impl DisplayBackend for WaylandBackend {
             None => (1920, 1080),
         };
 
+        let max_area = max_width * max_height;
+
         let mut connection = self.get_connection()?;
         let outputs: Vec<Output> =
             connection
@@ -420,6 +422,47 @@ impl DisplayBackend for WaylandBackend {
         let mut any_success = false;
 
         for output in target_outputs {
+            // Check if current resolution exceeds the max allowed resolution
+            if let Some(current_mode) = &output.current_mode {
+                let current_width = current_mode.width as u32;
+                let current_height = current_mode.height as u32;
+                let current_area = current_width * current_height;
+
+                // Only proceed if the current resolution is larger than the max allowed
+                if current_area <= max_area {
+                    debug!(
+                        "Current resolution {}x{} (area: {}) for output '{}' is already within the limit ({}x{}, area: {}). Skipping.",
+                        current_width,
+                        current_height,
+                        current_area,
+                        output.name,
+                        max_width,
+                        max_height,
+                        max_area
+                    );
+                    continue; // Skip to the next output
+                }
+
+                debug!(
+                    "Current resolution {}x{} (area: {}) for output '{}' exceeds the limit ({}x{}, area: {}). Finding best mode within limits.",
+                    current_width,
+                    current_height,
+                    current_area,
+                    output.name,
+                    max_width,
+                    max_height,
+                    max_area
+                );
+            } else {
+                // If no current mode is available, we cannot determine if it exceeds the limit
+                // For safety, we might choose to skip or proceed based on available modes
+                // Current implementation proceeds with mode selection logic
+                debug!(
+                    "No current mode available for output '{}'. Proceeding with mode selection within limits.",
+                    output.name
+                );
+            }
+
             // Find the best mode within the specified limits
             let best_mode = output
                 .modes
