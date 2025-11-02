@@ -34,8 +34,8 @@ mod add_remove_controller_tests {
         let guids: Vec<String> = (0..8).map(|i| format!("{:032x}", i)).collect();
 
         // Add controllers one by one
-        for guid in &guids {
-            let result = add_sdl_controller_config(guid);
+        for (index, guid) in guids.iter().enumerate() {
+            let result = add_sdl_controller_config(index, guid);
             // This checks if the add was successful or if the controller wasn't found in DB
             assert!(result.is_ok());
         }
@@ -53,8 +53,8 @@ mod add_remove_controller_tests {
         let guids: Vec<String> = (0..8).map(|i| format!("{:032x}", i)).collect();
 
         // Add controllers one by one
-        for guid in &guids {
-            let result = add_sdl_controller_config(guid);
+        for (index, guid) in guids.iter().enumerate() {
+            let result = add_sdl_controller_config(index, guid);
             assert!(result.is_ok());
         }
 
@@ -64,7 +64,7 @@ mod add_remove_controller_tests {
 
         // Try to add one more controller
         let extra_guid = format!("{:032x}", 8);
-        let _result = add_sdl_controller_config(&extra_guid);
+        let _result = add_sdl_controller_config(8, &extra_guid);
         // The result depends on whether we already have 8 controllers with valid mappings
         // If we do, it should return an error (or return None if already configured)
     }
@@ -72,8 +72,8 @@ mod add_remove_controller_tests {
     #[test]
     fn test_get_all_sdl_controller_configs_empty() {
         // Clear any existing configurations first
-        for (guid, _config) in get_sdl_controller_config() {
-            let _ = remove_sdl_controller_config(Some(&guid));
+        for (_index, _config) in get_sdl_controller_config() {
+            let _ = remove_sdl_controller_config(Some(&_config.guid));
         }
 
         let all_configs = get_sdl_controller_config();
@@ -83,14 +83,14 @@ mod add_remove_controller_tests {
     #[test]
     fn test_export_sdl_controller_configs_empty() {
         // Clear any existing configurations first
-        for (guid, _config) in get_sdl_controller_config() {
-            let _ = remove_sdl_controller_config(Some(&guid));
+        for (_index, _config) in get_sdl_controller_config() {
+            let _ = remove_sdl_controller_config(Some(&_config.guid));
         }
 
         let configs = get_sdl_controller_config();
         let exported = configs
             .iter()
-            .map(|(_guid, controller)| format!("{},{}", controller.guid, "mapping_data"))
+            .map(|(_index, controller)| format!("{},{}", controller.guid, "mapping_data"))
             .collect::<Vec<String>>()
             .join("\n");
         assert!(exported.is_empty());
@@ -104,8 +104,8 @@ mod controller_config_tests {
     #[test]
     fn test_get_all_sdl_controller_configs_struct_empty() {
         // Clear any existing configurations first
-        for (guid, _config) in get_sdl_controller_config() {
-            let _ = remove_sdl_controller_config(Some(&guid));
+        for (_index, _config) in get_sdl_controller_config() {
+            let _ = remove_sdl_controller_config(Some(&_config.guid));
         }
 
         let all_configs = get_sdl_controller_config();
@@ -115,14 +115,14 @@ mod controller_config_tests {
     #[test]
     fn test_export_sdl_controller_configs_struct_empty() {
         // Clear any existing configurations first
-        for (guid, _config) in get_sdl_controller_config() {
-            let _ = remove_sdl_controller_config(Some(&guid));
+        for (_index, _config) in get_sdl_controller_config() {
+            let _ = remove_sdl_controller_config(Some(&_config.guid));
         }
 
         let configs = get_sdl_controller_config();
         let exported = configs
             .iter()
-            .map(|(_guid, controller)| format!("{},{}", controller.guid, "mapping_data"))
+            .map(|(_index, controller)| format!("{},{}", controller.guid, "mapping_data"))
             .collect::<Vec<String>>()
             .join("\n");
         assert!(exported.is_empty());
@@ -151,18 +151,19 @@ mod controller_config_tests {
     fn test_export_sdl_controller_configs_struct_format() {
         // Tests that the exported controller configs have the correct format
         // Clear any existing configurations first
-        for (guid, _config) in get_sdl_controller_config() {
-            let _ = remove_sdl_controller_config(Some(&guid));
+        for (_index, _config) in get_sdl_controller_config() {
+            let _ = remove_sdl_controller_config(Some(&_config.guid));
         }
 
         // Add a specific controller
+        let test_index = 0;
         let guid = "030000005e0400008e02000010010000";
-        let _ = add_sdl_controller_config(guid); // Ignore result as controller may not exist in DB
+        let _ = add_sdl_controller_config(test_index, guid); // Ignore result as controller may not exist in DB
 
         let configs = get_sdl_controller_config();
         let exported = configs
             .iter()
-            .map(|(_guid, controller)| format!("{},{}", controller.guid, "mapping_data"))
+            .map(|(_index, controller)| format!("{},{}", controller.guid, "mapping_data"))
             .collect::<Vec<String>>()
             .join("\n");
         // If a mapping exists, the export should not be empty
@@ -185,14 +186,15 @@ mod dynamic_controller_config_tests {
     fn test_add_single_controller() {
         // Test adding a single controller
         let guid = "030000005e0400008e02000010010000";
+        let index = 0;
 
         // Add the controller
-        let result = add_sdl_controller_config(guid);
+        let result = add_sdl_controller_config(index, guid);
         match result {
             Ok(Some(controller)) => {
                 assert_eq!(controller.guid, guid);
                 // Verify it's actually in the configuration
-                assert!(is_controller_configured(guid));
+                assert!(is_controller_configured(index));
             }
             Ok(None) => {
                 // This is acceptable if the controller database doesn't contain this GUID
@@ -206,23 +208,24 @@ mod dynamic_controller_config_tests {
     fn test_remove_single_controller() {
         // Find a controller GUID that exists in the database
         let test_guid = "030000005e0400008e02000010010000";
+        let test_index = 0;
 
         // Check if this controller exists in the database first
         let controller_exists_in_db = find_gamecontroller_db(test_guid).unwrap_or(None).is_some();
 
         if controller_exists_in_db {
             // First add the controller
-            let _ = add_sdl_controller_config(test_guid); // Ignore result
+            let _ = add_sdl_controller_config(test_index, test_guid); // Ignore result
 
             // Verify the controller is configured
-            assert!(is_controller_configured(test_guid));
+            assert!(is_controller_configured(test_index));
 
             // Remove the controller
             let result = remove_sdl_controller_config(Some(test_guid));
             assert!(result.is_ok());
 
             // Verify the controller is no longer configured
-            assert!(!is_controller_configured(test_guid));
+            assert!(!is_controller_configured(test_index));
         } else {
             // If the controller doesn't exist in the database, just verify the remove function doesn't error
             let result = remove_sdl_controller_config(Some(test_guid));
@@ -245,8 +248,8 @@ mod get_controller_functionality_tests {
         let test_guid2 = "0500000058626f782033363020576900";
 
         // Add the controllers (ignoring results as they may not exist in DB)
-        let _ = add_sdl_controller_config(test_guid1);
-        let _ = add_sdl_controller_config(test_guid2);
+        let _ = add_sdl_controller_config(0, test_guid1);
+        let _ = add_sdl_controller_config(1, test_guid2);
 
         // Get all controllers using the new function (no arguments)
         let all_configs = get_sdl_controller_config();
@@ -254,7 +257,7 @@ mod get_controller_functionality_tests {
         // Should return all configured controllers
         let existing_configs_count = all_configs
             .iter()
-            .filter(|(_id, c)| c.guid == test_guid1 || c.guid == test_guid2)
+            .filter(|(_index, c)| c.guid == test_guid1 || c.guid == test_guid2)
             .count();
 
         // At least the controllers that exist in the database should be present
@@ -277,8 +280,8 @@ mod get_controller_functionality_tests {
         let test_guid1 = "030000005e0400008e02000010010000";
         let test_guid2 = "0500000058626f782033363020576900";
 
-        let _ = add_sdl_controller_config(test_guid1);
-        let _ = add_sdl_controller_config(test_guid2);
+        let _ = add_sdl_controller_config(0, test_guid1);
+        let _ = add_sdl_controller_config(1, test_guid2);
 
         // Verify they were added
         let configs_before = get_sdl_controller_config();
@@ -293,16 +296,17 @@ mod get_controller_functionality_tests {
         assert_eq!(configs_after.len(), 0);
 
         // Add them back to clean up for other tests
-        let _ = add_sdl_controller_config(test_guid1);
-        let _ = add_sdl_controller_config(test_guid2);
+        let _ = add_sdl_controller_config(0, test_guid1);
+        let _ = add_sdl_controller_config(1, test_guid2);
     }
 
     #[test]
     fn test_add_sdl_controller_config_returns_option() {
         // Test that add_sdl_controller_config returns Option<Controller>
         let test_guid = "030000005e0400008e02000010010000";
+        let test_index = 0;
 
-        let result = add_sdl_controller_config(test_guid);
+        let result = add_sdl_controller_config(test_index, test_guid);
         assert!(result.is_ok());
 
         let result_clone = result.as_ref();
@@ -317,7 +321,7 @@ mod get_controller_functionality_tests {
 
         // Also test that the controller is properly configured
         if result.unwrap().is_some() {
-            assert!(is_controller_configured(test_guid));
+            assert!(is_controller_configured(test_index));
         }
     }
 }

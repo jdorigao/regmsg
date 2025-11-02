@@ -21,8 +21,8 @@ pub struct Controller {
 ///
 /// This variable holds controller configurations in a thread-safe manner,
 /// using the Controller struct which contains GUID, name and input mappings.
-/// Uses HashMap for efficient insertions and removals by GUID.
-static SDL_CONTROLLER_CONFIG: OnceLock<Arc<Mutex<HashMap<String, Controller>>>> = OnceLock::new();
+/// Uses HashMap for efficient insertions and removals by index.
+static SDL_CONTROLLER_CONFIG: OnceLock<Arc<Mutex<HashMap<usize, Controller>>>> = OnceLock::new();
 
 /// Parses the controller mapping data into a name and input mappings
 ///
@@ -129,6 +129,7 @@ pub fn find_gamecontroller_db(guid_to_find: &str) -> io::Result<Option<String>> 
 /// static variable.
 ///
 /// # Arguments
+/// * `index` - The index position for the controller
 /// * `guid` - The GUID of the controller to add
 ///
 /// # Returns
@@ -136,11 +137,12 @@ pub fn find_gamecontroller_db(guid_to_find: &str) -> io::Result<Option<String>> 
 /// * `Ok(None)` - If the controller was not found in the database or is already configured
 /// * `Err(Box<dyn std::error::Error>)` - If there's an error accessing the mutex or if the maximum number of controllers (8) is reached
 pub fn add_sdl_controller_config(
+    index: usize,
     guid: &str,
 ) -> Result<Option<Controller>, Box<dyn std::error::Error>> {
-    // Check if the controller is already configured
-    if is_controller_configured(guid) {
-        debug!("Controller with GUID {} is already configured", guid);
+    // Check if the controller with this index is already configured
+    if is_controller_configured(index) {
+        debug!("Controller with index {} is already configured", index);
         return Ok(None); // Return None since it wasn't added (already exists)
     }
 
@@ -170,8 +172,8 @@ pub fn add_sdl_controller_config(
             inputs,
         };
 
-        // Add the controller configuration
-        sdl_controllers_config_guard.insert(guid.to_string(), controller.clone());
+        // Add the controller configuration using index as key
+        sdl_controllers_config_guard.insert(index, controller.clone());
         Ok(Some(controller))
     } else {
         debug!("Controller mapping not found for GUID: {}", guid);
@@ -207,11 +209,22 @@ pub fn remove_sdl_controller_config(
 
     let successfully_removed = match guid_opt {
         Some(guid) => {
-            // Remove specific controller configuration
+            // Remove specific controller configuration by GUID
             let mut removed_controllers = Vec::new();
-            if let Some(removed_controller) = sdl_controllers_config_guard.remove(guid) {
-                removed_controllers.push(removed_controller);
-            } else {
+            // Find the index that contains the controller with the matching GUID
+            let indices_to_remove: Vec<usize> = sdl_controllers_config_guard
+                .iter()
+                .filter(|(_, controller)| controller.guid == guid)
+                .map(|(index, _)| *index)
+                .collect();
+            
+            for index in indices_to_remove {
+                if let Some(removed_controller) = sdl_controllers_config_guard.remove(&index) {
+                    removed_controllers.push(removed_controller);
+                }
+            }
+            
+            if removed_controllers.is_empty() {
                 debug!("Controller with GUID {} was not found for removal", guid);
             }
             removed_controllers
@@ -234,8 +247,8 @@ pub fn remove_sdl_controller_config(
 /// SDL_CONTROLLER_CONFIG variable.
 ///
 /// # Returns
-/// A HashMap mapping controller GUIDs to Controller objects representing all configured controllers
-pub fn get_sdl_controller_config() -> HashMap<String, Controller> {
+/// A HashMap mapping controller indices to Controller objects representing all configured controllers
+pub fn get_sdl_controller_config() -> HashMap<usize, Controller> {
     if let Some(sdl_controllers_config) = SDL_CONTROLLER_CONFIG.get() {
         if let Ok(guard) = sdl_controllers_config.lock() {
             // Return all controllers as a HashMap
@@ -248,20 +261,20 @@ pub fn get_sdl_controller_config() -> HashMap<String, Controller> {
     }
 }
 
-/// This function checks if a controller with the specified GUID is
+/// This function checks if a controller with the specified index is
 /// currently in the SDL_CONTROLLER_CONFIG variable.
 /// NOTE: This function is primarily for internal use.
 ///
 /// # Arguments
-/// * `guid` - The GUID of the controller to check
+/// * `index` - The index of the controller to check
 ///
 /// # Returns
-/// * `true` - If the controller with the specified GUID is configured
+/// * `true` - If the controller with the specified index is configured
 /// * `false` - If the controller is not configured
-pub fn is_controller_configured(guid: &str) -> bool {
+pub fn is_controller_configured(index: usize) -> bool {
     if let Some(sdl_controllers_config) = SDL_CONTROLLER_CONFIG.get() {
         if let Ok(guard) = sdl_controllers_config.lock() {
-            return guard.contains_key(guid);
+            return guard.contains_key(&index);
         }
     }
     false

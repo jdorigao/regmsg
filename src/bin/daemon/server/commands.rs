@@ -179,16 +179,22 @@ pub fn init_commands() -> CommandRegistry {
         "addController",
         Box::new(super::command_registry::ArgCommand {
             name: "addController".to_string(),
-            description: "Adds controller to the system (single GUID at a time)".to_string(),
-            expected_args: 1,
+            description: "Adds controller to the system by index and GUID".to_string(),
+            expected_args: 2,
             executor: Box::new(|args| {
-                let guid = args[0].trim();
+                let index_str = args[0].trim();
+                let guid = args[1].trim();
+
+                // Parse the index
+                let index = index_str.parse::<usize>().map_err(|_| {
+                    format!("Invalid index: {}. Index must be a positive integer.", index_str)
+                })?;
 
                 if guid.is_empty() {
                     return Err("GUID cannot be empty.".into());
                 }
 
-                let _ = controller::add_controller(guid)?;
+                let _ = controller::add_controller(index, guid)?;
                 Ok(())
             }),
         }),
